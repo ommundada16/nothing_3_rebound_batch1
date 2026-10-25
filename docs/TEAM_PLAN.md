@@ -16,9 +16,9 @@ Owns `src/lib/geometry.js`, `repCounter.js`, `pose.js`, `sim.js`, `cues.js`, `sr
 
 ## Member B: care chain and safety net
 Owns `server/`, `shared/triage.js`, `objective.js`, `playbook.js`, `src/views/Chain.jsx`.
-- [ ] Unit tests for `server/issues.js` (escalation timing, follow-up rules, resolve needs a note)
-- [ ] Review every default playbook rule with the physio and update `shared/playbook.js`
-- [ ] Edge cases: simultaneous concerns, reopened issues, final level overdue
+- [ ] Review every default playbook rule with the physio and update `shared/playbook.js` (add a test for each rule you change in `tests/shared.test.js`)
+- [ ] Extend `tests/issues.test.js` (core escalation is covered): simultaneous concerns, reopened issues, server restart mid-escalation
+- [ ] Persistence and safety: validate request bodies in `server/index.js`, rate-limit media uploads
 - [ ] Optional: a push notification or WhatsApp stub for "urgent"
 
 ## Member C: patient and family experience, content
