@@ -6,6 +6,7 @@ import { heelChart, lsi, relTime, slrChart } from '../lib/data.js';
 import { mediaUrl } from '../lib/api.js';
 import { Card, LegFigure, Lightbox, LineChart, Stat, TierBadge, Toast, useToast } from '../components/ui.jsx';
 import { CueStudio, PlanStudio, PlaybookStudio, VideoStudio } from './Studio.jsx';
+import Validate from './Validate.jsx';
 
 export default function Physio({ store }) {
   const { state, now, refresh } = store;
@@ -21,6 +22,7 @@ export default function Physio({ store }) {
     ['videos', 'Videos'],
     ['plan', 'Plan'],
     ['playbook', 'My rules'],
+    ['validate', 'Accuracy check'],
   ];
   return (
     <main className="page">
@@ -35,6 +37,7 @@ export default function Physio({ store }) {
       {tab === 'cues' && <CueStudio state={state} refresh={refresh} toast={toast.show} />}
       {tab === 'videos' && <VideoStudio state={state} refresh={refresh} toast={toast.show} />}
       {tab === 'plan' && <PlanStudio state={state} refresh={refresh} toast={toast.show} suggestions={analysis.suggestions} />}
+      {tab === 'validate' && <Validate />}
       {tab === 'playbook' && <PlaybookStudio state={state} refresh={refresh} toast={toast.show} />}
       <Toast msg={toast.msg} onDone={toast.clear} />
     </main>
