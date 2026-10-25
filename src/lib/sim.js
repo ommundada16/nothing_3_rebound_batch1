@@ -117,3 +117,22 @@ export function drawScene(ctx, w, h, { exercise, stage } = {}) {
   ctx.fill();
   ctx.restore();
 }
+
+// Joint positions for drawing a figure from a measured value (used to render
+// a stand-in picture for seeded history, where no real photo exists).
+export function legPose(exercise, value, deficit = 0) {
+  if (exercise === 'heel_slide') {
+    const phi = rad(value / 2);
+    const hip = { x: 170, y: 262 };
+    const a = 120;
+    return {
+      hip,
+      knee: { x: hip.x + a * Math.cos(phi), y: hip.y - a * Math.sin(phi) },
+      ankle: { x: hip.x + 2 * a * Math.cos(phi), y: hip.y },
+    };
+  }
+  const hip = { x: 150, y: 276 };
+  const knee = { x: hip.x + 125 * Math.cos(rad(value)), y: hip.y - 125 * Math.sin(rad(value)) };
+  const ankle = { x: knee.x + 120 * Math.cos(rad(value - deficit)), y: knee.y - 120 * Math.sin(rad(value - deficit)) };
+  return { hip, knee, ankle };
+}

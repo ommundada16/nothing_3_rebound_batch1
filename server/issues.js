@@ -37,6 +37,13 @@ function titleFromReport(report, result) {
 export function createIssueFromReport(state, report) {
   const now = nowOf(state);
   const result = triage(report, state.playbook);
+  if (report.callRequest) {
+    // "Call me" skips triage on purpose: the patient always has a direct line.
+    result.tier = 'urgent';
+    result.label = 'Urgent';
+    result.reasons.unshift('The patient pressed "ask my physio to call me". This skips triage on purpose.');
+    result.guidance = ['Your physio has been asked to call you. Keep your phone near you.'];
+  }
   const sla = state.playbook.sla;
   const due = ackSla(result.tier, sla);
   const issue = {
@@ -47,7 +54,7 @@ export function createIssueFromReport(state, report) {
     tier: result.tier,
     originalTier: result.tier,
     type: 'patient_report',
-    title: titleFromReport(report, result),
+    title: report.callRequest ? 'Patient asked for a call' : titleFromReport(report, result),
     summary: report.text || '',
     symptoms: report.symptoms || [],
     pain: report.pain ?? null,
