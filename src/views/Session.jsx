@@ -62,6 +62,7 @@ export default function Session({ state, exerciseId, onExit, toast }) {
   const stopAll = useCallback(() => {
     const r = run.current;
     cancelAnimationFrame(rafRef.current);
+    clearTimeout(rafRef.current);
     if (r.pushTimer) clearInterval(r.pushTimer);
     if (r.capTimer) clearTimeout(r.capTimer);
     r.cues?.stop();
@@ -262,6 +263,12 @@ export default function Session({ state, exerciseId, onExit, toast }) {
   }
 
   // ---------- main loop ----------
+  // Simulated leg runs on a timer so it keeps going even if the window is in the
+  // background; the real camera follows the display refresh.
+  const schedule = () => {
+    const r = run.current;
+    rafRef.current = r.source === 'sim' ? setTimeout(loop, 33) : requestAnimationFrame(loop);
+  };
   const loop = () => {
     const r = run.current;
     if (!r.running) return;
@@ -280,7 +287,7 @@ export default function Session({ state, exerciseId, onExit, toast }) {
           landmarks = null;
         }
       } else {
-        rafRef.current = requestAnimationFrame(loop);
+        schedule();
         return;
       }
     } else {
@@ -341,7 +348,7 @@ export default function Session({ state, exerciseId, onExit, toast }) {
         low,
       });
     }
-    rafRef.current = requestAnimationFrame(loop);
+    schedule();
   };
 
   // ---------- finish ----------
