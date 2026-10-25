@@ -195,6 +195,8 @@ function Today({ state, now, store, setSession, setTab, dueFollowUps, toast }) {
         </button>
       </div>
 
+      <FamilyHelp state={state} now={now} refresh={refresh} toast={toast} />
+
       <Card title="Remember" tight>
         <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>
           {state.plan.precautions.map((p) => (
@@ -314,5 +316,44 @@ function Help({ state, now, dueFollowUps, result, setResult, refresh, toast }) {
         <MyConcerns state={state} now={now} />
       )}
     </div>
+  );
+}
+
+function FamilyHelp({ state, now, refresh, toast }) {
+  const fam = state.family || {};
+  const req = fam.helperRequest;
+  return (
+    <Card tight>
+      <div className="row between">
+        <div className="grow">
+          <b className="small">Need a hand with the phone or pillow?</b>
+          <div className="tiny muted">
+            {!req ? 'Ask your family. They will see a simple request.' : req.status === 'asked' ? `Asked ${relTime(req.ts, now())}. Waiting for someone to say they are coming.` : 'Someone is on their way.'}
+          </div>
+        </div>
+        {!req ? (
+          <button
+            className="btn small"
+            onClick={async () => {
+              await api.setKey('family', { ...fam, helperRequest: { ts: now(), status: 'asked' } }, 'patient');
+              await refresh();
+              toast.show('Your family has been asked.');
+            }}
+          >
+            Ask
+          </button>
+        ) : (
+          <button
+            className="btn small ghost"
+            onClick={async () => {
+              await api.setKey('family', { ...fam, helperRequest: null }, 'patient');
+              await refresh();
+            }}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+    </Card>
   );
 }

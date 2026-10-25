@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Component, useEffect, useState } from 'react';
 import { useStore } from './lib/api.js';
 import Patient from './views/Patient.jsx';
 import Physio from './views/Physio.jsx';
@@ -6,6 +6,31 @@ import Chain from './views/Chain.jsx';
 import Family from './views/Family.jsx';
 import Future from './views/Future.jsx';
 import DemoPanel from './views/DemoPanel.jsx';
+
+// A view that throws should never blank the whole app during a demo.
+class Boundary extends Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidUpdate(prev) {
+    if (this.state.error && prev.resetKey !== this.props.resetKey) this.setState({ error: null });
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <main className="page">
+        <div className="callout urgent">
+          <b>Something went wrong on this screen.</b>
+          <div className="small">{String(this.state.error.message || this.state.error)}</div>
+          <button className="btn small" style={{ marginTop: 8 }} onClick={() => this.setState({ error: null })}>
+            Try again
+          </button>
+        </div>
+      </main>
+    );
+  }
+}
 
 const ROLES = [
   { id: 'patient', label: 'Patient' },
@@ -67,16 +92,20 @@ export default function App() {
         <div className="page">
           <p className="muted">Loading…</p>
         </div>
-      ) : role === 'patient' ? (
-        <Patient store={store} />
-      ) : role === 'physio' ? (
-        <Physio store={store} />
-      ) : role === 'chain' ? (
-        <Chain store={store} />
-      ) : role === 'family' ? (
-        <Family store={store} />
       ) : (
-        <Future store={store} />
+        <Boundary resetKey={role}>
+          {role === 'patient' ? (
+            <Patient store={store} />
+          ) : role === 'physio' ? (
+            <Physio store={store} />
+          ) : role === 'chain' ? (
+            <Chain store={store} />
+          ) : role === 'family' ? (
+            <Family store={store} />
+          ) : (
+            <Future store={store} />
+          )}
+        </Boundary>
       )}
 
       {state && <DemoPanel store={store} setRole={setRole} />}
