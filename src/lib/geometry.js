@@ -1,0 +1,63 @@
+const deg = (r) => (r * 180) / Math.PI;
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+// Interior angle at b, in degrees, between rays b->a and b->c.
+// Points must be in the SAME pixel units for x and y (not normalised).
+export function angleAt(a, b, c) {
+  const v1 = { x: a.x - b.x, y: a.y - b.y };
+  const v2 = { x: c.x - b.x, y: c.y - b.y };
+  const m = Math.hypot(v1.x, v1.y) * Math.hypot(v2.x, v2.y);
+  if (!m) return null;
+  return deg(Math.acos(clamp((v1.x * v2.x + v1.y * v2.y) / m, -1, 1)));
+}
+
+// Knee flexion: 0 = straight leg, larger = more bent.
+export function flexionFrom(hip, knee, ankle) {
+  const i = angleAt(hip, knee, ankle);
+  return i == null ? null : 180 - i;
+}
+
+// Thigh elevation relative to the bed (horizontal axis of the image).
+export function liftFrom(hip, knee) {
+  const dx = Math.abs(knee.x - hip.x);
+  const dy = hip.y - knee.y; // image y points down
+  return deg(Math.atan2(dy, dx));
+}
+
+// Exponential smoothing that tolerates missing samples.
+export class Smoother {
+  constructor(alpha = 0.35) {
+    this.alpha = alpha;
+    this.v = null;
+  }
+  push(x) {
+    if (x == null || Number.isNaN(x)) return this.v;
+    this.v = this.v == null ? x : this.v + this.alpha * (x - this.v);
+    return this.v;
+  }
+  reset() {
+    this.v = null;
+  }
+}
+
+// Reads one leg out of a MediaPipe landmark list and returns pixel-space joints
+// plus a confidence (lowest visibility among the three joints).
+export function readLeg(landmarks, idx, width, height) {
+  if (!landmarks) return null;
+  const pick = (i) => {
+    const p = landmarks[i];
+    return p ? { x: p.x * width, y: p.y * height, v: p.visibility ?? 0 } : null;
+  };
+  const hip = pick(idx.hip);
+  const knee = pick(idx.knee);
+  const ankle = pick(idx.ankle);
+  if (!hip || !knee || !ankle) return null;
+  return { hip, knee, ankle, confidence: Math.min(hip.v, knee.v, ankle.v) };
+}
+
+// Choose the leg (left/right) that the camera sees better.
+export function bestSide(landmarks, LEG) {
+  if (!landmarks) return 'left';
+  const score = (idx) => Math.min(landmarks[idx.hip]?.visibility ?? 0, landmarks[idx.knee]?.visibility ?? 0, landmarks[idx.ankle]?.visibility ?? 0);
+  return score(LEG.left) >= score(LEG.right) ? 'left' : 'right';
+}

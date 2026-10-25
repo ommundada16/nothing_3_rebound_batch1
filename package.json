@@ -12,7 +12,8 @@
     "start": "vite build && node server/index.js",
     "setup": "node scripts/setup-assets.mjs",
     "postinstall": "node scripts/setup-assets.mjs",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "dev:phone": "concurrently -k -n api,web -c blue,green \"node server/index.js\" \"vite --host --mode phone\""
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "0.10.21",
