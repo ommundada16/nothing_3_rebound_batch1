@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+server/data/
+# fetched by `npm run setup` (see scripts/setup-assets.mjs)
+public/wasm/
+public/models/
+*.log
+.DS_Store

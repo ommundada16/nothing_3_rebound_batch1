@@ -1,0 +1,28 @@
+{
+  "name": "physio-twin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Physio Twin - carry your physio home. Hackathon prototype (Srujana, Problem 1).",
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c blue,green \"node server/index.js\" \"vite --host\"",
+    "server": "node server/index.js",
+    "web": "vite --host",
+    "build": "vite build",
+    "start": "vite build && node server/index.js",
+    "setup": "node scripts/setup-assets.mjs",
+    "postinstall": "node scripts/setup-assets.mjs"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "0.10.21",
+    "express": "^4.21.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^1.2.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "vite": "^5.4.11"
+  }
+}
