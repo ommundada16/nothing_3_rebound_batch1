@@ -105,7 +105,7 @@ export function analyze({ sessions, now, surgeryTs, playbook }) {
         tier: 'review',
         level: 1,
         title: 'Active range well below assisted range',
-        detail: `Over 3 days the knee goes about ${Math.round(gap)}° further with help than alone. The knee can move more; the patient is holding back (fear, pain or weakness). Coaching and reassurance, not more stiffness work.`,
+        detail: `Over 3 days the knee goes about ${Math.round(gap)}° further with help than alone. The difference needs physio review of pain, technique, assistance and recording quality. These readings alone do not identify the cause.`,
       });
     }
   }
@@ -125,7 +125,7 @@ export function analyze({ sessions, now, surgeryTs, playbook }) {
         level: 2,
         ccLevels: [4],
         title: 'Both active and assisted range flat, and below the milestone',
-        detail: `Assisted range has stayed near ${Math.round(Math.max(...assisted))}° for ${recent.length} days; milestone for day ${dp} is about ${Math.round(target)}°. Even with help the knee is not gaining. This pattern can mean scar stiffness. Early review matters.`,
+        detail: `Assisted range has stayed near ${Math.round(Math.max(...assisted))}° for ${recent.length} days; milestone for day ${dp} is about ${Math.round(target)}°. The recorded range is not increasing. A clinician should review the patient and recording quality; the camera cannot diagnose stiffness.`,
       });
     }
   }

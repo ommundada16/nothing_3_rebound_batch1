@@ -26,7 +26,7 @@ export default function RefVideos({ refVideos, exerciseId }) {
   const v = refVideos?.[exerciseId] || {};
   return (
     <div className="grid two">
-      <Slot title="How it should look" subtitle="Reference: a healthy person" id={v.stock} />
+      {exerciseId === 'heel_slide' ? <><Slot title="Heel slide on your own" subtitle="Healthy-person reference · active" id={v.stock_active || v.stock}/><Slot title="Heel slide with help" subtitle="Healthy-person reference · assisted" id={v.stock_assisted}/></> : <Slot title="How it should look" subtitle="Reference: a healthy person" id={v.stock} />}
       <Slot title="Your own set-up" subtitle="Recorded with your physio, in your room" id={v.home} />
     </div>
   );

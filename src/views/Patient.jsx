@@ -6,6 +6,7 @@ import { api } from '../lib/api.js';
 import { heelChart, relTime, sessionsToday, slrChart } from '../lib/data.js';
 import { Card, Icon, LineChart, Stat, Toast, useToast } from '../components/ui.jsx';
 import RefVideos from '../components/RefVideos.jsx';
+import DailyCare, { CareReminders } from './DailyCare.jsx';
 import Session from './Session.jsx';
 import { MyConcerns, ReportForm, ReportResult } from './Report.jsx';
 
@@ -39,6 +40,8 @@ export default function Patient({ store }) {
 
   return (
     <main className="page phone">
+      <CareReminders store={store}/>
+      {tab === 'care' && <DailyCare store={store}/>}
       {tab === 'today' && <Today state={state} now={now} store={store} setSession={setSession} setTab={setTab} dueFollowUps={dueFollowUps} toast={toast} />}
       {tab === 'progress' && <Progress state={state} now={now} />}
       {tab === 'help' && (
@@ -57,6 +60,7 @@ export default function Patient({ store }) {
         <div className="tabbar-inner">
           {[
             ['today', 'Today', 'today'],
+            ['care', 'Daily care', 'today'],
             ['progress', 'Progress', 'chart'],
             ['help', 'Help', 'help'],
           ].map(([id, label, icon]) => (
@@ -152,11 +156,11 @@ function Today({ state, now, store, setSession, setTab, dueFollowUps, toast }) {
               <span>
                 <div className="title">{cfg.name}</div>
                 <div className="small muted">
-                  {pe.reps} reps · hold {pe.holdSec} seconds
+                  {pe.reps} reps  /  hold {pe.holdSec} seconds
                 </div>
               </span>
               <span className="chev" aria-hidden="true">
-                ›
+                &rsaquo;
               </span>
             </button>
           );
@@ -220,8 +224,8 @@ function Progress({ state, now }) {
       <Card>
         <div className="row between">
           <Stat n={streak(state.sessions, now())} l="day streak" />
-          <Stat n={bestActive != null ? `${Math.round(bestActive)}°` : '–'} l="best bend on your own" />
-          <Stat n={bestAssisted != null ? `${Math.round(bestAssisted)}°` : '–'} l="best bend with help" />
+          <Stat n={bestActive != null ? `${Math.round(bestActive)}°` : '-'} l="best bend on your own" />
+          <Stat n={bestAssisted != null ? `${Math.round(bestAssisted)}°` : '-'} l="best bend with help" />
         </div>
       </Card>
 

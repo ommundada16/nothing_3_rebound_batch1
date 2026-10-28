@@ -118,3 +118,14 @@ test('the clock helper is consistent', () => {
   s.clockOffsetMs += 5 * MIN;
   assert.ok(nowOf(s) - before >= 5 * MIN);
 });
+
+
+test('suspected medicine side effects reach the assistant doctor without a diagnosis', () => {
+  const state = freshState('progressing');
+  const { issue, result } = createIssueFromReport(state, {suspectedSideEffect:true, text:'Nausea after a medicine', symptoms:[], pain:0});
+  assert.equal(issue.level, 3);
+  assert.equal(issue.tier, 'review');
+  assert.ok(issue.notifiedLevels.includes(3));
+  assert.equal(result.startLevel, 3);
+  assert.ok(issue.dueAt);
+});

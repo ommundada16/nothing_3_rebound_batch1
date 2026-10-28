@@ -73,3 +73,13 @@ tests/       node:test suites
 - The simulated leg and synthetic history are used for the demo and tests.
 
 See `docs/` for the team plan, demo script and the checklist for the physio session.
+
+
+## Accounts and daily care (28 October)
+
+Open the site and create a patient, physio and family account using separate email addresses.
+This prototype supports one care group and one account per role. Accounts in the group connect automatically.
+The physio records reusable clips under My voice and enters prescription details, dietitian targets and appointments under Daily care.
+The patient/family can record doses and meals, see in-app reminders, report suspected medicine side effects to the assistant-doctor queue, and keep insurance notes.
+Equipment is guidance only; there is no checkout. No push/SMS delivery or verified NGO partnerships are connected.
+Existing videos are preserved. The two workspace heel-slide videos are imported as active and assisted healthy-person references at startup.

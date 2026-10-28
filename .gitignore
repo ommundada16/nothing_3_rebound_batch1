@@ -7,3 +7,5 @@ public/wasm/
 public/models/
 *.log
 .DS_Store
+
+tmp/

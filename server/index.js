@@ -1,6 +1,8 @@
 import express from 'express';
+import { installAccounts } from './accounts.js';
+import { emptyCare, validateCare } from '../shared/care.js';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { freshState, SCENARIOS } from './seed.js';
@@ -15,7 +17,7 @@ import {
 } from './issues.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = resolve(__dirname, 'data');
+const DATA_DIR = process.env.PHYSIO_DATA_DIR || resolve(__dirname, 'data');
 const MEDIA_DIR = resolve(DATA_DIR, 'media');
 const STATE_FILE = resolve(DATA_DIR, 'state.json');
 const MEDIA_INDEX = resolve(DATA_DIR, 'media.json');
@@ -23,6 +25,8 @@ const PORT = Number(process.env.PORT || 8787);
 
 mkdirSync(MEDIA_DIR, { recursive: true });
 
+// Import the user's two supplied reference videos without touching home-video slots.
+const referenceFiles = [['stock_active','self knee slide.mp4'],['stock_assisted','assisted knee slide.mp4']];
 // Optional: a Groq key lets the app polish clinician notes. Everything works without it.
 loadDotEnv();
 function loadDotEnv() {
@@ -53,29 +57,68 @@ function commit() {
 
 const app = express();
 app.use(express.json({ limit: '8mb' }));
+const accounts = installAccounts(app, resolve(DATA_DIR, 'accounts.json'));
+if (!state.care) { state.care = emptyCare(); commit(); }
+if (!process.env.PHYSIO_SKIP_IMPORT) {
+ for (const [slot,name] of referenceFiles) {
+  const source=resolve(__dirname,'..','..',name);
+  if(existsSync(source) && !state.refVideos?.heel_slide?.[slot]) {
+   const id=randomUUID();copyFileSync(source,resolve(MEDIA_DIR,id));
+   media[id]={mime:'video/mp4',kind:'video',name,ts:Date.now()};
+   state.refVideos.heel_slide={...state.refVideos.heel_slide,[slot]:id};
+   writeFileSync(MEDIA_INDEX,JSON.stringify(media));commit();
+  }
+ }
+}
+// This build supports one patient, one assigned physio and one guardian.
+app.use('/api', (req,res,next) => {
+ if(req.path.startsWith('/auth/') || req.path === '/health') return next();
+ if(!req.account) return res.status(401).json({error:'Please sign in.'});
+ const role=req.account.role;
+ if(role === 'family' && req.method === 'POST' && req.path === '/sessions') return res.status(403).json({error:'Exercise sessions are recorded from the patient account.'});
+ if(role !== 'physio' && (req.path.startsWith('/clock/') || req.path === '/reset' || req.path === '/ai/note' || /\/issues\/[^/]+\/action/.test(req.path))) return res.status(403).json({error:'Only the physio can do this.'});
+ if(req.method === 'PUT' && req.path.startsWith('/state/')) {
+  const key=req.path.split('/').pop();
+  if(role !== 'physio' && !['care','family'].includes(key)) return res.status(403).json({error:'Only the physio can edit this plan.'});
+ }
+ next();
+});
+app.get('/api/household', (_req,res) => res.json({members:accounts.users.map(accounts.publicUser)}));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, rev: state.rev, ai: Boolean(process.env.GROQ_API_KEY) }));
 
 app.get('/api/state', (req, res) => {
   const since = Number(req.query.since || 0);
   if (since === state.rev) return res.json({ rev: state.rev, unchanged: true });
-  res.json({ rev: state.rev, state: { ...state, serverNow: nowOf(state), scenarios: SCENARIOS, ai: Boolean(process.env.GROQ_API_KEY) } });
+  const visible = req.account.role === 'family' ? {
+    patient:{name:state.patient.name,surgeryTs:state.patient.surgeryTs},
+    family:state.family,care:state.care,plan:{exercises:state.plan.exercises.map(e=>({id:e.id}))},
+    issues:state.issues.map(i=>({id:i.id,status:i.status,tier:i.tier})),
+    sessions:state.sessions.map(s=>({id:s.id,exercise:s.exercise,ts:s.ts}))
+  } : state;
+  res.json({ rev: state.rev, state: { ...visible, serverNow: nowOf(state), scenarios: SCENARIOS, ai: Boolean(process.env.GROQ_API_KEY) } });
 });
 
 app.post('/api/reset', (req, res) => {
   const scenario = SCENARIOS[req.body?.scenario] ? req.body.scenario : 'progressing';
   const rev = state.rev + 1;
-  state = freshState(scenario);
+  const retained = {care:state.care,cues:state.cues,cueLanguage:state.cueLanguage,refVideos:state.refVideos};
+  state = {...freshState(scenario), ...retained};
   state.rev = rev;
   syncObjective(state);
   persist();
   res.json({ ok: true, scenario });
 });
 
-const EDITABLE = new Set(['plan', 'playbook', 'cues', 'cueLanguage', 'refVideos', 'family', 'patient']);
+const EDITABLE = new Set(['plan', 'playbook', 'cues', 'cueLanguage', 'refVideos', 'family', 'patient', 'care']);
 app.put('/api/state/:key', (req, res) => {
   const { key } = req.params;
   if (!EDITABLE.has(key)) return res.status(400).json({ error: 'Not editable' });
+  if (key === 'care') {
+    const next = req.body.value;
+    if (!validateCare(next)) return res.status(400).json({error:'Check the care plan fields and times.'});
+    if(req.account.role !== 'physio' && (JSON.stringify(next.medicines)!==JSON.stringify(state.care.medicines) || next.proteinTarget!==state.care.proteinTarget || JSON.stringify(next.appointments)!==JSON.stringify(state.care.appointments))) return res.status(403).json({error:'Only the care team can change medicines, targets or appointments.'});
+  }
   state[key] = req.body.value;
   state.audit.push({ id: randomUUID(), ts: nowOf(state), by: req.body.by || 'physio', text: `Updated ${key}` });
   commit();
@@ -99,7 +142,9 @@ app.post('/api/sessions', (req, res) => {
 });
 
 app.post('/api/issues', (req, res) => {
-  const { issue, result } = createIssueFromReport(state, req.body || {});
+  const report = req.body || {};
+  const { issue, result } = createIssueFromReport(state, report);
+
   commit();
   res.json({ issue, result });
 });
@@ -196,7 +241,8 @@ if (existsSync(DIST)) {
 }
 
 setInterval(() => {
-  if (tick(state)) commit();
+  const newFlags = syncObjective(state);
+  if (tick(state) || newFlags.length) commit();
 }, 5000);
 
 app.listen(PORT, '0.0.0.0', () => {

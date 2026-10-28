@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import DailyCare, { CareReminders } from './DailyCare.jsx';
 import { EXERCISES } from '../../shared/exercises.js';
 import { dayPostOp } from '../../shared/time.js';
 import { api } from '../lib/api.js';
@@ -8,6 +10,7 @@ import { Card, Icon, Toast, useToast } from '../components/ui.jsx';
 // reason for family members to quiz the patient about their exercises.
 export default function Family({ store }) {
   const { state, now, refresh } = store;
+  const [tab,setTab]=useState('care');
   const toast = useToast();
   const fam = state.family || { shareLevel: 'status', helperRequest: null };
   const open = state.issues.filter((i) => i.status !== 'resolved');
@@ -19,8 +22,8 @@ export default function Family({ store }) {
   const someToday = todays.length > 0;
 
   let status;
-  if (urgent) status = { c: 'urgent', t: 'The care team is looking at something now', d: 'Keep the phone nearby. A physio may call.' };
-  else if (review) status = { c: 'review', t: 'A physio is looking at a message', d: 'Nothing for you to do. They will get in touch if they need to.' };
+  if (urgent) status = { c: 'urgent', t: 'A concern is waiting for the care team', d: 'Keep the phone nearby. A physio may call.' };
+  else if (review) status = { c: 'review', t: 'A message is awaiting physio review', d: 'Nothing for you to do. They will get in touch if they need to.' };
   else if (doneToday) status = { c: 'ok', t: 'All done for today', d: 'Exercises finished. A good day.' };
   else if (someToday) status = { c: 'fyi', t: 'Part way through today', d: 'Some exercises are done. The rest are still to do.' };
   else status = { c: 'fyi', t: 'Exercises not done yet today', d: 'There is still time. A gentle reminder is fine, but please do not quiz them.' };
@@ -36,7 +39,9 @@ export default function Family({ store }) {
 
   return (
     <main className="page phone">
-      <div className="stack">
+      <div className="tabs"><button className={`tab ${tab==='care'?'active':''}`} onClick={()=>setTab('care')}>Daily care</button><button className={`tab ${tab==='recovery'?'active':''}`} onClick={()=>setTab('recovery')}>Recovery & help</button></div>
+      <CareReminders store={store}/>
+      {tab === 'care' ? <DailyCare store={store} family/> : <div className="stack">
         <div>
           <p className="muted small" style={{ margin: 0 }}>
             For the family of
@@ -109,7 +114,7 @@ export default function Family({ store }) {
 
         <Card title="What is shared with the family" tight>
           <p className="tiny muted" style={{ marginTop: 0 }}>
-            Chosen once at set-up by the patient. Medical details, photos and pain scores are never shown here.
+            Chosen once at set-up by the patient. Exercise sharing is chosen once. Medicines and appointments are shared for daily care; private exercise photos and pain scores are not shown here.
           </p>
           <div className="chips">
             {[
@@ -122,7 +127,7 @@ export default function Family({ store }) {
             ))}
           </div>
         </Card>
-      </div>
+      </div>}
       <Toast msg={toast.msg} onDone={toast.clear} />
     </main>
   );

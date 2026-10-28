@@ -6,11 +6,13 @@ import { heelChart, lsi, relTime, slrChart } from '../lib/data.js';
 import { mediaUrl } from '../lib/api.js';
 import { Card, LegFigure, Lightbox, LineChart, Stat, TierBadge, Toast, useToast } from '../components/ui.jsx';
 import { CueStudio, PlanStudio, PlaybookStudio, VideoStudio } from './Studio.jsx';
+import DailyCare from './DailyCare.jsx';
+import Connections from './Connections.jsx';
 import Validate from './Validate.jsx';
 
 export default function Physio({ store }) {
   const { state, now, refresh } = store;
-  const [tab, setTab] = useState('overview');
+  const [tab, setTab] = useState(Object.values(state.cues || {}).some(clips => clips.length) ? 'overview' : 'cues');
   const toast = useToast();
   const analysis = useMemo(
     () => analyze({ sessions: state.sessions, now: now(), surgeryTs: state.patient.surgeryTs, playbook: state.playbook }),
@@ -18,6 +20,8 @@ export default function Physio({ store }) {
   );
   const TABS = [
     ['overview', 'Patient overview'],
+    ['connections', 'My account'],
+    ['care', 'Daily care'],
     ['cues', 'My voice'],
     ['videos', 'Videos'],
     ['plan', 'Plan'],
@@ -33,6 +37,8 @@ export default function Physio({ store }) {
           </button>
         ))}
       </div>
+      {tab === 'connections' && <Connections/>}
+      {tab === 'care' && <DailyCare store={store} editor/>}
       {tab === 'overview' && <Overview state={state} now={now} analysis={analysis} />}
       {tab === 'cues' && <CueStudio state={state} refresh={refresh} toast={toast.show} />}
       {tab === 'videos' && <VideoStudio state={state} refresh={refresh} toast={toast.show} />}
@@ -50,7 +56,7 @@ function verdict(state, analysis, dp) {
   const gap = f.find((x) => x.type === 'holding_back');
   const stiff = f.find((x) => x.type === 'possible_stiffness');
   if (stiff) return { kind: 'urgent', title: "Can't: possible mechanical stiffness", text: stiff.detail, action: 'Consider early review by the surgeon: manipulation works best early. More exercise alone is unlikely to help.' };
-  if (gap) return { kind: 'review', title: "Won't (yet): the patient is holding back", text: gap.detail, action: 'The knee has more range than the patient uses. Coach and reassure, use your voice, and look at pain and fear before adding stiffness work.' };
+  if (gap) return { kind: 'review', title: "Active and assisted movement differ", text: gap.detail, action: 'Review pain, technique and recording quality with the patient before deciding what the difference means.' };
   const hs = heelChart(state.sessions, state.patient.surgeryTs);
   if (!hs.rows.length) return { kind: 'fyi', title: 'Not enough data yet', text: 'Needs a few days with active and assisted sessions.', action: '' };
   return { kind: 'ok', title: 'On track', text: `Active and assisted ranges are moving together and are near the day-${dp} milestone.`, action: 'Nothing to do. Keep the plan.' };
@@ -91,7 +97,7 @@ function Overview({ state, now, analysis }) {
           <div>
             <h1 style={{ margin: 0 }}>{state.patient.name}</h1>
             <p className="muted" style={{ margin: 0 }}>
-              {state.patient.procedure} · day {dp} · {state.patient.age} years · surgery {fmtDay(sx)}
+              {state.patient.procedure}  /  day {dp}  /  {state.patient.age} years  /  surgery {fmtDay(sx)}
             </p>
           </div>
           <div className="row" style={{ gap: 24 }}>
@@ -150,7 +156,7 @@ function Overview({ state, now, analysis }) {
             xLabel={xLabel}
           />
           <p className="tiny muted" style={{ marginBottom: 0 }}>
-            A large gap means the knee can bend more than the patient dares to. A small gap with low numbers means the knee itself is stiff.
+            A difference between active and assisted readings needs a physio to review pain, technique and recording quality. The camera cannot identify the cause.
           </p>
         </Card>
       </div>
@@ -201,15 +207,15 @@ function Overview({ state, now, analysis }) {
               </button>
               <div className="row between" style={{ marginTop: 8 }}>
                 <b className="small">
-                  {EXERCISES[s.exercise].name} · {s.mode}
+                  {EXERCISES[s.exercise].name}  /  {s.mode}
                 </b>
                 <span className="tiny muted">
                   {fmtDay(s.ts)} {fmtTime(s.ts)}
                 </span>
               </div>
               <div className="tiny muted">
-                best {Math.round(s.metrics?.peak || 0)}°{s.metrics?.deficit != null ? ` · lag ${Math.round(s.metrics.deficit)}°` : ''} · {s.cameraSource === 'seed' ? 'synthetic history' : s.cameraSource === 'sim' ? 'simulated leg' : 'camera'}
-                {s.selfReport ? ` · felt ${s.selfReport.confidence}/5, pain ${s.selfReport.pain}` : ''}
+                best {Math.round(s.metrics?.peak || 0)}°{s.metrics?.deficit != null ? `  /  lag ${Math.round(s.metrics.deficit)}°` : ''}  /  {s.cameraSource === 'seed' ? 'synthetic history' : s.cameraSource === 'sim' ? 'simulated leg' : 'camera'}
+                {s.selfReport ? `  /  felt ${s.selfReport.confidence}/5, pain ${s.selfReport.pain}` : ''}
               </div>
             </div>
           ))}
@@ -264,7 +270,7 @@ function Overview({ state, now, analysis }) {
             .slice(0, 30)
             .map((a) => (
               <li key={a.id}>
-                <span className="muted">{relTime(a.ts, now())}</span> · {a.by}: {a.text}
+                <span className="muted">{relTime(a.ts, now())}</span>  /  {a.by}: {a.text}
               </li>
             ))}
         </ul>

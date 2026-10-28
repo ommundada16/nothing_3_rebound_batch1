@@ -235,14 +235,14 @@ export function VideoStudio({ state, refresh, toast }) {
       <Card>
         <h2 style={{ margin: 0 }}>Reference videos</h2>
         <p className="muted small" style={{ margin: 0 }}>
-          Two videos per exercise. The patient watches both before practising, so there is no confusion about the position, the pillow or the camera.
+          Healthy-person reference videos and the patient’s home video are kept separately. Heel slides have separate references for doing it alone and with help.
         </p>
         <video ref={preview} muted playsInline style={{ width: '100%', maxHeight: rec ? 260 : 0, borderRadius: 10, marginTop: rec ? 10 : 0, background: '#000' }} />
       </Card>
       {Object.values(EXERCISES).map((ex) => (
         <Card key={ex.id} title={ex.name}>
           <div className="grid two">
-            {KINDS.map(([kind, title, hint]) => {
+            {(ex.id === 'heel_slide' ? [['stock_active','Reference: heel slide on your own','Healthy-person demonstration, without assistance.'],['stock_assisted','Reference: heel slide with help','Healthy-person demonstration, with assistance.'],KINDS[1]] : KINDS).map(([kind, title, hint]) => {
               const id = state.refVideos?.[ex.id]?.[kind];
               const isRec = rec && rec.ex === ex.id && rec.kind === kind;
               return (

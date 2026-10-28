@@ -83,3 +83,11 @@ test('healthy progress raises no flags', () => {
   const { flags } = analyze({ sessions, now, surgeryTs, playbook: PB });
   assert.equal(flags.length, 0);
 });
+
+
+test('explicit chest and breathing free text triggers emergency guidance',()=>{
+ const result=triage({text:'chest pain and breathlessness',symptoms:[],pain:0},PB);
+ assert.equal(result.emergency,true);
+ assert.equal(result.tier,'urgent');
+ assert.match(result.guidance[0],/emergency/);
+});

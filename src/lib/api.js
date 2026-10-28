@@ -40,7 +40,7 @@ export const mediaUrl = (id) => (id ? `/api/media/${id}` : null);
 
 // Polls the server for changes. Everything (patient phone, physio laptop,
 // care-chain views) shares this one source of truth.
-export function useStore() {
+export function useStore(enabled = true) {
   const [state, setState] = useState(null);
   const [error, setError] = useState(null);
   const rev = useRef(0);
@@ -61,10 +61,11 @@ export function useStore() {
   }, []);
 
   useEffect(() => {
+    if (!enabled) { rev.current = 0; setState(null); return; }
     refresh();
     const t = setInterval(refresh, 1500);
     return () => clearInterval(t);
-  }, [refresh]);
+  }, [refresh, enabled]);
 
   // "Now" on the server's (possibly demo-advanced) clock.
   const now = useCallback(() => (state ? state.serverNow + (Date.now() - fetchedAt.current) : Date.now()), [state]);

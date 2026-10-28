@@ -80,6 +80,24 @@ export function createIssueFromReport(state, report) {
       },
     ],
   };
+  if (report.suspectedSideEffect) {
+    issue.title = 'Suspected medicine side effect';
+    issue.level = 3;
+    issue.notifiedLevels = [...new Set([...issue.notifiedLevels, 3])];
+    if (issue.tier === 'fyi') {
+      issue.tier = 'review'; issue.originalTier = 'review';
+      issue.dueAt = now + sla.reviewAckMin * MIN;
+      result.tier = 'review'; result.label = 'Review';
+    }
+    result.startLevel = 3; result.notifyLevels = issue.notifiedLevels;
+    const reason = 'A suspected medicine side effect was reported for assistant-doctor review.';
+    issue.reasons = [...issue.reasons, reason]; result.reasons = issue.reasons;
+    if (!issue.emergency) {
+      issue.guidance = ['Your report is in the assistant doctor’s review list. Contact the treating team for advice about the medicine; the app has not changed your prescription.'];
+      result.guidance = issue.guidance;
+    }
+    issue.thread.push({ts:now,by:'system',text:reason});
+  }
   state.issues.push(issue);
   audit(state, 'system', `New ${result.label} concern from patient: ${issue.title}`, issue.id);
   return { issue, result };

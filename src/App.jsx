@@ -1,5 +1,6 @@
 import { Component, useEffect, useState } from 'react';
-import { useStore } from './lib/api.js';
+import { api, useStore } from './lib/api.js';
+import Account from './views/Account.jsx';
 import Patient from './views/Patient.jsx';
 import Physio from './views/Physio.jsx';
 import Chain from './views/Chain.jsx';
@@ -55,10 +56,19 @@ function useHashRole() {
 }
 
 export default function App() {
-  const store = useStore();
+  const [user, setUser] = useState(null);
+  const [checking, setChecking] = useState(true);
+  const [authError, setAuthError] = useState('');
+  useEffect(() => { api.get('/api/auth/me').then(r=>setUser(r.user)).catch(e=>setAuthError(e.message)).finally(()=>setChecking(false)); }, []);
+  const store = useStore(Boolean(user));
   const [role, setRole] = useHashRole();
   const { state, error } = store;
 
+  const choices = user?.role === 'physio' ? ROLES.filter(r=>['physio','chain','future'].includes(r.id)) : ROLES.filter(r=>r.id===user?.role);
+  const currentRole = choices.some(r=>r.id===role) ? role : user?.role;
+  const ready = u => {setUser(u);setRole(u.role);};
+  if(checking) return <main className="page"><p>Opening Physio Twin…</p></main>;
+  if(!user) return <><header className="topbar"><div className="topbar-inner brand">Physio Twin</div></header>{authError&&<p className="page" role="alert">Cannot connect: {authError}. Start the server and refresh.</p>}<Account onReady={ready}/></>;
   return (
     <>
       <header className="topbar">
@@ -76,14 +86,16 @@ export default function App() {
             <span className="tiny muted" style={{ marginRight: 6 }}>
               View as
             </span>
-            <select className="view-select" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Switch between patient, physio, care chain, family and future views">
-              {ROLES.map((r) => (
+            <select className="view-select" value={currentRole} onChange={(e) => setRole(e.target.value)} aria-label="Switch between patient, physio, care chain, family and future views">
+              {choices.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.label}
                 </option>
               ))}
             </select>
           </label>
+          <span className="account-name tiny">{user.name}</span>
+          <button className="btn small" onClick={async()=>{await api.post('/api/auth/logout');setUser(null);}}>Sign out</button>
         </div>
       </header>
 
@@ -98,14 +110,14 @@ export default function App() {
           <p className="muted">Loading…</p>
         </div>
       ) : (
-        <Boundary resetKey={role}>
-          {role === 'patient' ? (
+        <Boundary resetKey={currentRole}>
+          {currentRole === 'patient' ? (
             <Patient store={store} />
-          ) : role === 'physio' ? (
+          ) : currentRole === 'physio' ? (
             <Physio store={store} />
-          ) : role === 'chain' ? (
+          ) : currentRole === 'chain' ? (
             <Chain store={store} />
-          ) : role === 'family' ? (
+          ) : currentRole === 'family' ? (
             <Family store={store} />
           ) : (
             <Future store={store} />
@@ -113,7 +125,7 @@ export default function App() {
         </Boundary>
       )}
 
-      {state && <DemoPanel store={store} setRole={setRole} />}
+      {state && user.role === 'physio' && <DemoPanel store={store} setRole={setRole} />}
     </>
   );
 }

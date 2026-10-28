@@ -1,3 +1,27 @@
+# Update — 28 October: accounts and daily care
+
+The sections below this update describe the previous build. This update takes precedence for the changed features.
+
+- Missed-session objective checks now also run on the server timer; explicit chest/breathing emergency text now follows the emergency checkbox workflow.
+- User asked to leave live camera setup/testing and patient home recordings until 29 October. Earlier camera/hold-counter findings are still pending; do not claim they were fixed.
+- New sign-up/sign-in for patient, physio and family. This is one care group only: one account per role, automatically linked. This is a controlled hackathon prototype, not a multi-clinic account system. No invitation/verification/password-reset workflow yet.
+- Passwords are salted and hashed; sign-in uses an HttpOnly session cookie. Sessions expire in 24 hours or when the server restarts. Accounts persist in ignored server/data/accounts.json. Never commit runtime data or real credentials.
+- Patient and family have Daily care: shared medicine check-offs, food/protein log, appointments, equipment guidance, insurance notes and official financial-help links.
+- Physio has Daily care for entering the treating doctor's prescription, dietitian's protein target and follow-up appointments. Family/patient cannot change these protected fields through the API.
+- Suspected medicine side effects from patient/family are routed to level 3 (assistant doctor). This is an in-app review entry, not an SMS or external notification. The app does not diagnose side effects or change prescriptions.
+- Reminder banners refresh every 30 seconds while open. No background/push notification service.
+- The earlier “can’t vs won’t” framing is not a diagnosis: active/assisted differences need clinician review. Dashboard and flag descriptions now state this limitation.
+- Physio voice clips remain saved and reused in the single care group. My account lists registered group members. Multiple assigned physios/patients are future work.
+- Family API responses omit private exercise photos, pain scores, clinic baseline and playbook.
+- Two supplied videos at D:/srujana/self knee slide.mp4 and D:/srujana/assisted knee slide.mp4 are imported on server startup into healthy-person active/assisted reference slots. Home slots are preserved and remain separate. Existing stock/home uploads are not overwritten.
+- User confirmed "EMR" meant EMS. BFR and EMS are not automatically recommended or sold. Equipment list is phase-based discussion guidance linked to AAOS, without checkout or vendor claims.
+- Nutrition guidance links to Royal National Orthopaedic Hospital. No automatic protein prescription. Financial help links to official PM-JAY information; no verified NGO partnerships.
+- Mobile layout uses available width, wraps controls, stacks grids and keeps content below the header. Verify on physical phone tomorrow too.
+- Verified: 32 automated tests pass; production build passes. Isolated integration checks cover all three accounts, protected prescription fields, family privacy, dose logging, assistant-doctor routing and video references. Browser checks cover patient/family daily care at phone width and physio setup at tablet width. The normal app is served at http://localhost:8787.
+- Tests: npm test; npm run build. Integration script scripts/check-accounts.mjs uses TEST_BASE and MUST ONLY point to an isolated test server, because it creates fictional accounts and edits care plans. Use PHYSIO_DATA_DIR pointing to tmp/review-data with PORT=8791. tmp/ is ignored.
+
+---
+
 # HANDOFF: Physio Twin (Srujana Hackathon, Problem 1)
 
 Last updated: 2026-10-28 (the day before the prototype deadline).

@@ -53,6 +53,11 @@ export function triage(report, playbook) {
     if (text && wordHit(text, w)) raise('review', `Your message mentions "${w}".`);
   }
 
+  if (/chest\s+(pain|tightness)|breathless|shortness of breath|difficulty breathing|trouble breathing|cannot breathe|can't breathe/.test(text)) {
+    emergency = true;
+    raise('urgent', 'Your message describes chest or breathing symptoms that need emergency attention.');
+    guidance.unshift('Call the emergency number now. Do not wait for a reply from the app or the physio.');
+  }
   if (report.photo) reasons.push('A photo is attached for the physio to look at.');
   if (!reasons.length) reasons.push('No red-flag symptoms ticked. A physio still sees this in the daily digest.');
 
