@@ -59,6 +59,7 @@ const app = express();
 app.use(express.json({ limit: '8mb' }));
 const accounts = installAccounts(app, resolve(DATA_DIR, 'accounts.json'));
 if (!state.care) { state.care = emptyCare(); commit(); }
+if (state.plan.exercises.some(e => e.id !== 'heel_slide')) { state.plan.exercises = state.plan.exercises.filter(e => e.id === 'heel_slide'); commit(); }
 if (!process.env.PHYSIO_SKIP_IMPORT) {
  for (const [slot,name] of referenceFiles) {
   const source=resolve(__dirname,'..','..',name);
@@ -94,7 +95,7 @@ app.get('/api/state', (req, res) => {
     patient:{name:state.patient.name,surgeryTs:state.patient.surgeryTs},
     family:state.family,care:state.care,plan:{exercises:state.plan.exercises.map(e=>({id:e.id}))},
     issues:state.issues.map(i=>({id:i.id,status:i.status,tier:i.tier})),
-    sessions:state.sessions.map(s=>({id:s.id,exercise:s.exercise,ts:s.ts}))
+    sessions:state.sessions.map(s=>({id:s.id,exercise:s.exercise,mode:s.mode,ts:s.ts}))
   } : state;
   res.json({ rev: state.rev, state: { ...visible, serverNow: nowOf(state), scenarios: SCENARIOS, ai: Boolean(process.env.GROQ_API_KEY) } });
 });
@@ -246,5 +247,5 @@ setInterval(() => {
 }, 5000);
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[api] Physio Twin server on http://localhost:${PORT}  (AI polish: ${process.env.GROQ_API_KEY ? 'on' : 'off'})`);
+  console.log(`[api] Rebound server on http://localhost:${PORT}  (AI polish: ${process.env.GROQ_API_KEY ? 'on' : 'off'})`);
 });

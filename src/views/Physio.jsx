@@ -15,7 +15,7 @@ export default function Physio({ store }) {
   const [tab, setTab] = useState(Object.values(state.cues || {}).some(clips => clips.length) ? 'overview' : 'cues');
   const toast = useToast();
   const analysis = useMemo(
-    () => analyze({ sessions: state.sessions, now: now(), surgeryTs: state.patient.surgeryTs, playbook: state.playbook }),
+    () => analyze({ sessions: state.sessions.filter(s => s.exercise === 'heel_slide'), now: now(), surgeryTs: state.patient.surgeryTs, playbook: state.playbook }),
     [state, now],
   );
   const TABS = [
@@ -87,7 +87,7 @@ function Overview({ state, now, analysis }) {
   const conf = [...selfByDay.entries()].map(([x, r]) => ({ x, y: Math.round(avg(r.c) * 10) / 10 }));
   const pain = [...selfByDay.entries()].map(([x, r]) => ({ x, y: Math.round(avg(r.p) * 10) / 10 }));
 
-  const recent = [...state.sessions].sort((a, b) => b.ts - a.ts).slice(0, 6);
+  const recent = [...state.sessions].filter(s => s.exercise === 'heel_slide').sort((a, b) => b.ts - a.ts).slice(0, 6);
   const xLabel = (x) => `Day ${x}`;
 
   return (
@@ -162,23 +162,8 @@ function Overview({ state, now, analysis }) {
       </div>
 
       <details className="more">
-        <summary>More charts (leg raise, confidence and pain)</summary>
+        <summary>Confidence and pain</summary>
       <div className="grid two" style={{ marginTop: 8 }}>
-        <Card title="Quad lag (straight leg raise): knee deficit at the top">
-          <LineChart
-            series={[
-              { name: 'Active', color: '#0f766e', points: slr.active },
-              { name: 'Assisted', color: '#6d5bd0', points: slr.assisted, dashed: true },
-            ]}
-            hLines={[
-              { y: t.quadLagWarn, label: `warn ${t.quadLagWarn}°`, color: '#a15c07' },
-              { y: t.quadLagReady, label: `ready to progress ${t.quadLagReady}°`, color: '#17803d' },
-            ]}
-            annotations={slr.switchDay != null ? [{ x: slr.switchDay, label: 'pillow removed' }] : []}
-            yMin={0}
-            xLabel={xLabel}
-          />
-        </Card>
         <Card title="Patient's own report: confidence and pain">
           <LineChart
             series={[

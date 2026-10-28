@@ -1,3 +1,16 @@
+# Update — Rebound exercise simplification
+
+- Product name in the app and browser title is now Rebound (repository folder unchanged).
+- Patient has two separate tasks: Heel slide — unassisted and Heel slide — assisted. They use the existing heel_slide engine with distinct active/assisted modes. Completion is checked separately for each mode.
+- Exercise pages immediately show the matching healthy-person video. The home video appears when uploaded; no empty home-video placeholder is shown.
+- Removed the mode selector and extra setup panels. Camera/demo settings and clinician reminders are under one optional section. Base text is larger.
+- Logo returns to the signed-in account's landing screen and resets nested navigation, even when the URL already points home.
+- Active plans are migrated to heel slides only; historical leg-raise recordings remain saved but do not generate new objective flags.
+- Leg raise is hidden from current exercise choices, video management, patient charts and recent-session display. Existing implementation and historical data are retained for later.
+- Family session summaries now include mode so assisted and unassisted completion remain separate.
+
+---
+
 # Update — 28 October: accounts and daily care
 
 The sections below this update describe the previous build. This update takes precedence for the changed features.

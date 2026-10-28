@@ -37,3 +37,13 @@ export const LEG = {
   left: { hip: 23, knee: 25, ankle: 27, heel: 29, foot: 31 },
   right: { hip: 24, knee: 26, ankle: 28, heel: 30, foot: 32 },
 };
+
+// Two separate patient tasks, sharing the heel-slide measurement engine.
+export function heelSlideTasks(plan) {
+  const exercise = plan.exercises.find(e => e.id === 'heel_slide');
+  if (!exercise) return [];
+  return [
+    {...exercise, key:'heel-slide-active', mode:'active', name:'Heel slide — unassisted', description:'On your own'},
+    {...exercise, key:'heel-slide-assisted', mode:'assisted', name:'Heel slide — assisted', description:'With help'},
+  ];
+}

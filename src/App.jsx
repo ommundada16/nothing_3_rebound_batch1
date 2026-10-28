@@ -57,6 +57,7 @@ function useHashRole() {
 
 export default function App() {
   const [user, setUser] = useState(null);
+  const [homeVisit, setHomeVisit] = useState(0);
   const [checking, setChecking] = useState(true);
   const [authError, setAuthError] = useState('');
   useEffect(() => { api.get('/api/auth/me').then(r=>setUser(r.user)).catch(e=>setAuthError(e.message)).finally(()=>setChecking(false)); }, []);
@@ -66,22 +67,23 @@ export default function App() {
 
   const choices = user?.role === 'physio' ? ROLES.filter(r=>['physio','chain','future'].includes(r.id)) : ROLES.filter(r=>r.id===user?.role);
   const currentRole = choices.some(r=>r.id===role) ? role : user?.role;
+  const goHome = () => { setRole(user?.role || 'patient'); setHomeVisit(n=>n+1); window.scrollTo(0,0); };
   const ready = u => {setUser(u);setRole(u.role);};
-  if(checking) return <main className="page"><p>Opening Physio Twin…</p></main>;
-  if(!user) return <><header className="topbar"><div className="topbar-inner brand">Physio Twin</div></header>{authError&&<p className="page" role="alert">Cannot connect: {authError}. Start the server and refresh.</p>}<Account onReady={ready}/></>;
+  if(checking) return <main className="page"><p>Opening Rebound…</p></main>;
+  if(!user) return <><header className="topbar"><div className="topbar-inner"><a className="brand brand-home" href="/">Rebound</a></div></header>{authError&&<p className="page" role="alert">Cannot connect: {authError}. Start the server and refresh.</p>}<Account onReady={ready}/></>;
   return (
     <>
       <header className="topbar">
         <div className="topbar-inner">
-          <div className="brand">
+          <button type="button" className="brand brand-home" onClick={goHome} aria-label="Rebound home">
             <span className="brand-mark">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M7 4v9a5 5 0 0 0 5 5h6" />
                 <circle cx="18" cy="18" r="1.6" fill="#fff" />
               </svg>
             </span>
-            Physio Twin
-          </div>
+            Rebound
+          </button>
           <label className="view-select-wrap" style={{ marginLeft: 'auto' }}>
             <span className="tiny muted" style={{ marginRight: 6 }}>
               View as
@@ -110,7 +112,7 @@ export default function App() {
           <p className="muted">Loading…</p>
         </div>
       ) : (
-        <Boundary resetKey={currentRole}>
+        <Boundary key={`${user.id}-${homeVisit}`} resetKey={currentRole}>
           {currentRole === 'patient' ? (
             <Patient store={store} />
           ) : currentRole === 'physio' ? (

@@ -920,3 +920,21 @@ video,audio,img,svg { max-width:100%; }
  .daily-care .tabs { position:static; flex-wrap:wrap; overflow:visible; gap:2px; }
  .daily-care .tab { padding:10px 8px; font-size:.85rem; }
 }
+
+/* Rebound: larger, quieter exercise screens. */
+body { font-size:18px; line-height:1.55; }
+h1 { font-size:1.85rem; } h2 { font-size:1.4rem; } h3 { font-size:1.15rem; }
+.small,label.field { font-size:1rem; } .tiny { font-size:.9rem; }
+.brand-home { border:0; padding:0; background:transparent; color:var(--ink); font:inherit; font-weight:750; cursor:pointer; text-decoration:none; }
+.exercise-card { margin-top:14px; padding:20px 12px; border:1px solid var(--line); border-radius:14px; background:var(--surface); }
+.exercise-card .title { font-size:1.2rem; }
+.exercise-setup { max-width:760px; margin:0 auto; }
+.exercise-setup > * + * { margin-top:18px; }
+.exercise-setup h1 { font-size:1.9rem; }
+.exercise-prescription { padding:14px 16px; background:var(--brand-soft); border-radius:12px; }
+.back-link { color:var(--ink); text-align:left; text-decoration:none; font-size:1rem; }
+.reference-video video { display:block; margin-top:10px; }
+.reference-video .small { font-size:1.1rem; }
+.btn.big { font-size:1.15rem; min-height:56px; }
+.tabbar button { font-size:.95rem; }
+@media(max-width:640px) { .topbar .brand { font-size:1.15rem; } .exercise-setup h1 { font-size:1.6rem; } .exercise-card .title { font-size:1.12rem; } }

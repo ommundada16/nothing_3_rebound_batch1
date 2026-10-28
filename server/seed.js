@@ -131,7 +131,6 @@ export function freshState(scenario = 'progressing', now = Date.now()) {
     plan: {
       exercises: [
         { id: 'heel_slide', reps: 8, holdSec: 3, modes: ['active', 'assisted'] },
-        { id: 'slr', reps: 8, holdSec: 5, modes: ['active', 'assisted'], stage: 'pillow' },
       ],
       precautions: [
         'No pillow directly under the knee when resting.',

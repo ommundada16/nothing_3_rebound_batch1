@@ -137,7 +137,7 @@ export default function Future() {
                 </tr>
                 <tr>
                   <td>
-                    <b>Physio Twin</b>
+                    <b>Rebound</b>
                   </td>
                   <td>The physio teaches once; his voice, his room, his rules</td>
                   <td>Separates "can't" from "won't"; a fail-safe chain that never closes a concern by itself</td>

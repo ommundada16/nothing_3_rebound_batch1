@@ -22,8 +22,12 @@ function Slot({ title, subtitle, id }) {
 
 // Two videos per exercise: a clean reference from a healthy person, and a clip
 // of THIS patient doing it in THEIR room with THEIR physio and THEIR props.
-export default function RefVideos({ refVideos, exerciseId }) {
+export default function RefVideos({ refVideos, exerciseId, mode }) {
   const v = refVideos?.[exerciseId] || {};
+  if (mode) {
+    const id = mode === 'assisted' ? v.stock_assisted : (v.stock_active || v.stock);
+    return <div className="stack reference-video"><Slot title="Follow this demonstration" subtitle={mode === 'assisted' ? 'Heel slide with help' : 'Heel slide on your own'} id={id}/>{v.home && <Slot title="Your own home set-up" subtitle="Recorded with your physiotherapist" id={v.home}/>}</div>;
+  }
   return (
     <div className="grid two">
       {exerciseId === 'heel_slide' ? <><Slot title="Heel slide on your own" subtitle="Healthy-person reference · active" id={v.stock_active || v.stock}/><Slot title="Heel slide with help" subtitle="Healthy-person reference · assisted" id={v.stock_assisted}/></> : <Slot title="How it should look" subtitle="Reference: a healthy person" id={v.stock} />}

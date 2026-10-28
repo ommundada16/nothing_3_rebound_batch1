@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import DailyCare, { CareReminders } from './DailyCare.jsx';
-import { EXERCISES } from '../../shared/exercises.js';
+import { EXERCISES, heelSlideTasks } from '../../shared/exercises.js';
 import { dayPostOp } from '../../shared/time.js';
 import { api } from '../lib/api.js';
 import { relTime, sessionsToday } from '../lib/data.js';
@@ -18,7 +18,8 @@ export default function Family({ store }) {
   const review = open.some((i) => i.tier === 'review');
   const todays = sessionsToday(state.sessions, now());
   const last = [...state.sessions].sort((a, b) => b.ts - a.ts)[0];
-  const doneToday = state.plan.exercises.every((pe) => todays.some((s) => s.exercise === pe.id));
+  const tasks = heelSlideTasks(state.plan);
+  const doneToday = tasks.length > 0 && tasks.every(pe => todays.some(s => s.exercise === pe.id && s.mode === pe.mode));
   const someToday = todays.length > 0;
 
   let status;
@@ -60,11 +61,11 @@ export default function Family({ store }) {
         {fam.shareLevel === 'status_exercises' && (
           <Card title="Today's exercises" tight>
             <ul className="list-clean">
-              {state.plan.exercises.map((pe) => {
-                const done = todays.some((s) => s.exercise === pe.id);
+              {tasks.map((pe) => {
+                const done = todays.some((s) => s.exercise === pe.id && s.mode === pe.mode);
                 return (
-                  <li key={pe.id} className="row between">
-                    <span>{EXERCISES[pe.id].name}</span>
+                  <li key={pe.key} className="row between">
+                    <span>{pe.name}</span>
                     <span className={`badge ${done ? 'ok' : 'plain'}`}>{done ? 'Done' : 'To do'}</span>
                   </li>
                 );

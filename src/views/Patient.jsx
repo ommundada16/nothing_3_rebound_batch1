@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { EXERCISES } from '../../shared/exercises.js';
+import { EXERCISES, heelSlideTasks } from '../../shared/exercises.js';
 import { expectedFlexion } from '../../shared/objective.js';
 import { dayPostOp, dayIndex } from '../../shared/time.js';
 import { api } from '../lib/api.js';
@@ -26,7 +26,8 @@ export default function Patient({ store }) {
       <main className="page phone">
         <Session
           state={state}
-          exerciseId={session}
+          exerciseId={session.id}
+          initialMode={session.mode}
           toast={(m) => toast.show(m)}
           onExit={() => {
             setSession(null);
@@ -120,7 +121,8 @@ function Today({ state, now, store, setSession, setTab, dueFollowUps, toast }) {
   const todays = sessionsToday(state.sessions, now());
   const hour = new Date(now()).getHours();
   const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  const doneCount = state.plan.exercises.filter((pe) => todays.some((s) => s.exercise === pe.id)).length;
+  const tasks = heelSlideTasks(state.plan);
+  const doneCount = tasks.filter(pe => todays.some(s => s.exercise === pe.id && s.mode === pe.mode)).length;
 
   const callPhysio = async () => {
     if (!window.confirm('Ask your physio to call you? They will be alerted straight away.')) return;
@@ -144,17 +146,17 @@ function Today({ state, now, store, setSession, setTab, dueFollowUps, toast }) {
         <div className="row between" style={{ marginBottom: 2 }}>
           <h2 style={{ margin: 0 }}>Today</h2>
           <span className="small muted">
-            {doneCount} of {state.plan.exercises.length} done
+            {doneCount} of {tasks.length} done
           </span>
         </div>
-        {state.plan.exercises.map((pe) => {
+        {tasks.map((pe) => {
           const cfg = EXERCISES[pe.id];
-          const done = todays.some((s) => s.exercise === pe.id);
+          const done = todays.some((s) => s.exercise === pe.id && s.mode === pe.mode);
           return (
-            <button key={pe.id} className="row-link" onClick={() => setSession(pe.id)}>
+            <button key={pe.key} className="row-link exercise-card" onClick={() => setSession(pe)}>
               <span className={`dot ${done ? 'done' : ''}`}>{done ? '✓' : ''}</span>
               <span>
-                <div className="title">{cfg.name}</div>
+                <div className="title">{pe.name}</div>
                 <div className="small muted">
                   {pe.reps} reps  /  hold {pe.holdSec} seconds
                 </div>
@@ -245,23 +247,7 @@ function Progress({ state, now }) {
         )}
       </Card>
 
-      <details className="more">
-        <summary>Leg raise progress</summary>
-      <Card title="Keeping the knee straight when you lift">
-        <LineChart
-          series={[
-            { name: 'On your own', color: '#0f766e', points: slr.active },
-            { name: 'With help', color: '#6d5bd0', points: slr.assisted, dashed: true },
-          ]}
-          annotations={slr.switchDay != null ? [{ x: slr.switchDay, label: 'pillow removed' }] : []}
-          yMin={0}
-          xLabel={xLabel}
-        />
-        <p className="small muted" style={{ marginBottom: 0 }}>
-          Lower is better here: it shows how far from straight the knee is at the top of the lift. A small lag between the two lines is common while the thigh muscle wakes up.
-        </p>
-      </Card>
-      </details>
+
     </div>
   );
 }

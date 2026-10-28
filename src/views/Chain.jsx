@@ -179,7 +179,6 @@ function WhatChanged({ state, now }) {
           {row('Heel slide, active', f(hsA.prev), f(hsA.last))}
           {row('Heel slide, assisted', f(hsS.prev), f(hsS.last))}
           {row('Gap (assisted − active)', hsA.prev != null && hsS.prev != null ? f(hsS.prev - hsA.prev) : '–', hsA.last != null && hsS.last != null ? f(hsS.last - hsA.last) : '–')}
-          {row('Leg raise, knee deficit (active)', f(slrA.prev), f(slrA.last))}
           {row(`Your milestone for day ${dp}`, '', `${milestone}°`)}
         </tbody>
       </table>

@@ -239,7 +239,7 @@ export function VideoStudio({ state, refresh, toast }) {
         </p>
         <video ref={preview} muted playsInline style={{ width: '100%', maxHeight: rec ? 260 : 0, borderRadius: 10, marginTop: rec ? 10 : 0, background: '#000' }} />
       </Card>
-      {Object.values(EXERCISES).map((ex) => (
+      {Object.values(EXERCISES).filter(ex => ex.id === 'heel_slide').map((ex) => (
         <Card key={ex.id} title={ex.name}>
           <div className="grid two">
             {(ex.id === 'heel_slide' ? [['stock_active','Reference: heel slide on your own','Healthy-person demonstration, without assistance.'],['stock_assisted','Reference: heel slide with help','Healthy-person demonstration, with assistance.'],KINDS[1]] : KINDS).map(([kind, title, hint]) => {
@@ -297,7 +297,7 @@ export function PlanStudio({ state, refresh, toast, suggestions }) {
 
   return (
     <div className="stack">
-      {suggestions.map((s) => (
+      {suggestions.filter(s => s.type !== 'suggest_progression').map((s) => (
         <div key={s.key} className="callout review">
           <b>{s.title}</b> {s.detail}
           <div style={{ marginTop: 8 }}>
@@ -318,7 +318,7 @@ export function PlanStudio({ state, refresh, toast, suggestions }) {
       ))}
       <Card title="Prescribed exercises">
         <div className="stack">
-          {plan.exercises.map((e) => (
+          {plan.exercises.filter(e => e.id === 'heel_slide').map((e) => (
             <div key={e.id} className="grid three">
               <div>
                 <label className="field">Exercise</label>
