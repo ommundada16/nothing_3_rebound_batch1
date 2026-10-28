@@ -1,47 +1,26 @@
 :root {
-  --bg: #f4f7f7;
+  --bg: #f4f5f6;
   --surface: #ffffff;
-  --surface-2: #eef3f3;
-  --ink: #0e2a2d;
-  --muted: #56696d;
-  --line: #d9e3e4;
-  --brand: #0f766e;
+  --surface-2: #f1f3f4;
+  --ink: #2a3b4d;
+  --muted: #6f7c89;
+  --line: #e5e9ec;
+  --brand: #f47b20;
   --brand-ink: #ffffff;
-  --brand-soft: #d9f1ee;
-  --urgent: #b42318;
-  --urgent-soft: #fde7e4;
-  --review: #a15c07;
-  --review-soft: #fdf0d5;
-  --fyi: #1d5fc4;
-  --fyi-soft: #e1ecfb;
-  --ok: #17803d;
-  --ok-soft: #def3e5;
-  --shadow: 0 1px 2px rgba(14, 42, 45, 0.06), 0 4px 14px rgba(14, 42, 45, 0.06);
-  --radius: 14px;
+  --brand-soft: #fff0e3;
+  --navy: #2a3b4d;
+  --urgent: #c0392b;
+  --urgent-soft: #fdeceb;
+  --review: #b9690b;
+  --review-soft: #fff4de;
+  --fyi: #2f6db5;
+  --fyi-soft: #e8f0fa;
+  --ok: #2e8b57;
+  --ok-soft: #e5f5ec;
+  --shadow: 0 1px 3px rgba(42, 59, 77, 0.08);
+  --radius: 18px;
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --bg: #0b1718;
-    --surface: #122326;
-    --surface-2: #19302f;
-    --ink: #e5f1f1;
-    --muted: #9bb2b4;
-    --line: #26403f;
-    --brand: #2dd4bf;
-    --brand-ink: #04211e;
-    --brand-soft: #123c38;
-    --urgent: #ff8a7a;
-    --urgent-soft: #3d1b17;
-    --review: #f5b95b;
-    --review-soft: #3a2a0d;
-    --fyi: #7db2ff;
-    --fyi-soft: #14284a;
-    --ok: #5fd68a;
-    --ok-soft: #123a22;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-  }
+  color-scheme: light;
 }
 
 * {
@@ -723,4 +702,161 @@ table.tbl th {
     padding: 7px 4px;
     font-size: 0.8rem;
   }
+}
+
+/* ---------- light, simple theme (matches the clinic app the patient already knows) ---------- */
+.topbar {
+  background: var(--surface);
+  backdrop-filter: none;
+}
+.card {
+  border: none;
+  box-shadow: var(--shadow);
+}
+.card.flat {
+  border: 1px solid var(--line);
+  box-shadow: none;
+}
+.btn {
+  border-radius: 999px;
+  border: none;
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.btn:hover {
+  background: #e7eaec;
+}
+.btn.primary {
+  background: var(--brand);
+  color: #fff;
+}
+.btn.danger {
+  background: var(--urgent);
+  color: #fff;
+}
+.btn.ghost {
+  background: transparent;
+}
+.chip {
+  border: none;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+}
+.chip.on {
+  background: var(--navy);
+  color: #fff;
+  font-weight: 600;
+}
+.chip.on.danger {
+  background: var(--urgent);
+  color: #fff;
+}
+.role-btn.active,
+.tab.active {
+  color: var(--brand);
+}
+.role-btn.active {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.tab.active {
+  border-bottom-color: var(--brand);
+}
+.tabbar {
+  box-shadow: 0 -1px 4px rgba(42, 59, 77, 0.06);
+  border-top: none;
+}
+.tabbar button.active {
+  color: var(--brand);
+}
+.node.active {
+  background: var(--navy);
+  border-color: var(--navy);
+}
+.callout {
+  border-left-color: var(--brand);
+  background: var(--brand-soft);
+}
+.meter > i {
+  background: var(--brand);
+}
+.badge.plain {
+  background: var(--surface-2);
+}
+
+/* simple lists used on the home screen */
+.row-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 16px 4px;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  border-bottom: 1px solid var(--line);
+  min-height: 64px;
+}
+.row-link:last-child {
+  border-bottom: none;
+}
+.row-link .title {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+.row-link .chev {
+  margin-left: auto;
+  color: var(--muted);
+}
+.dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  display: grid;
+  place-items: center;
+  flex: 0 0 26px;
+  color: #fff;
+  font-size: 0.8rem;
+}
+.dot.done {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+.link-btn {
+  background: none;
+  border: none;
+  font: inherit;
+  color: var(--muted);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 8px 4px;
+}
+details.more > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 8px 2px;
+}
+.view-select {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: none;
+  background: var(--surface-2);
+  color: var(--ink);
+  width: auto;
+  margin-left: auto;
+}
+.demo-fab {
+  background: var(--navy);
+  color: #fff;
+  padding: 7px 12px;
+  opacity: 0.85;
+  bottom: 70px;
 }

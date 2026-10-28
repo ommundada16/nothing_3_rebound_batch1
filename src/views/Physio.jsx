@@ -81,7 +81,7 @@ function Overview({ state, now, analysis }) {
   const conf = [...selfByDay.entries()].map(([x, r]) => ({ x, y: Math.round(avg(r.c) * 10) / 10 }));
   const pain = [...selfByDay.entries()].map(([x, r]) => ({ x, y: Math.round(avg(r.p) * 10) / 10 }));
 
-  const recent = [...state.sessions].sort((a, b) => b.ts - a.ts).slice(0, 8);
+  const recent = [...state.sessions].sort((a, b) => b.ts - a.ts).slice(0, 6);
   const xLabel = (x) => `Day ${x}`;
 
   return (
@@ -153,6 +153,11 @@ function Overview({ state, now, analysis }) {
             A large gap means the knee can bend more than the patient dares to. A small gap with low numbers means the knee itself is stiff.
           </p>
         </Card>
+      </div>
+
+      <details className="more">
+        <summary>More charts (leg raise, confidence and pain)</summary>
+      <div className="grid two" style={{ marginTop: 8 }}>
         <Card title="Quad lag (straight leg raise): knee deficit at the top">
           <LineChart
             series={[
@@ -181,6 +186,7 @@ function Overview({ state, now, analysis }) {
           />
         </Card>
       </div>
+      </details>
 
       <Card title="Recent sessions and peak moments">
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))' }}>
@@ -210,6 +216,8 @@ function Overview({ state, now, analysis }) {
         </div>
       </Card>
 
+      <details className="more">
+        <summary>Clinic test results (example data)</summary>
       <Card title="Clinic testing alongside the home data">
         <p className="small muted" style={{ marginTop: 0 }}>
           {state.clinicBaseline.note} ({state.clinicBaseline.source}, {state.clinicBaseline.date}).
@@ -244,6 +252,7 @@ function Overview({ state, now, analysis }) {
           </tbody>
         </table>
       </Card>
+      </details>
 
       <details>
         <summary className="small muted" style={{ cursor: 'pointer' }}>

@@ -4,6 +4,7 @@ import { api, mediaUrl } from '../lib/api.js';
 import { relTime } from '../lib/data.js';
 import { Card, Icon, TierBadge } from '../components/ui.jsx';
 
+const COMMON = ['chest_breath', 'swelling_up', 'calf_swelling', 'fever', 'locking', 'clicking', 'low_mood'];
 const levelName = (n) => CARE_LEVELS.find((l) => l.level === n)?.title || 'Care team';
 
 // Records a short voice note (the patient can just say what is wrong).
@@ -101,18 +102,31 @@ export function ReportForm({ state, onSent }) {
 
   return (
     <div className="stack">
-      <div className="callout small">
-        Tell us what is happening. Your physio sees <b>every</b> message. This app only decides who looks first and how fast. It will never tell you that something is "nothing".
-      </div>
+      <p className="muted" style={{ margin: 0 }}>
+        Tell us what is happening. Your physio sees every message.
+      </p>
 
       <Card title="What are you noticing?">
         <div className="chips">
-          {SYMPTOMS.map((s) => (
-            <button key={s.id} type="button" className={`chip ${symptoms.includes(s.id) ? 'on' : ''} ${s.emergency ? 'danger' : ''}`} onClick={() => toggle(s.id)}>
-              {s.label}
-            </button>
-          ))}
+          {COMMON.map((id) => {
+            const s = SYMPTOMS.find((x) => x.id === id);
+            return (
+              <button key={id} type="button" className={`chip ${symptoms.includes(id) ? 'on' : ''} ${s.emergency ? 'danger' : ''}`} onClick={() => toggle(id)}>
+                {s.label}
+              </button>
+            );
+          })}
         </div>
+        <details className="more">
+          <summary>More things you might notice</summary>
+          <div className="chips" style={{ marginTop: 6 }}>
+            {SYMPTOMS.filter((s) => !COMMON.includes(s.id)).map((s) => (
+              <button key={s.id} type="button" className={`chip ${symptoms.includes(s.id) ? 'on' : ''}`} onClick={() => toggle(s.id)}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </details>
       </Card>
 
       <Card title={`Pain right now: ${pain} / 10`}>
@@ -123,20 +137,23 @@ export function ReportForm({ state, onSent }) {
         </div>
       </Card>
 
-      <Card title="Anything else? (optional)">
-        <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="For example: the knee felt like it slipped when I stood up from the bed…" />
-        <div className="row wrap" style={{ marginTop: 10 }}>
-          <VoiceNote onDone={setVoiceId} />
-          <label className="btn" style={{ cursor: 'pointer' }}>
-            {photoId ? 'Photo added' : 'Add a photo of the knee'}
-            <input type="file" accept="image/*" capture="environment" onChange={onPhoto} style={{ display: 'none' }} />
-          </label>
-        </div>
-        {photoName && <p className="tiny muted">{photoName}</p>}
-        <p className="tiny muted" style={{ marginBottom: 0 }}>
-          Photos go to your physio, who looks at them. The app does not judge a photo.
-        </p>
-      </Card>
+      <details className="more">
+        <summary>Add words, a voice note or a photo (optional)</summary>
+        <Card>
+          <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="For example: the knee felt like it slipped when I stood up from the bed…" />
+          <div className="row wrap" style={{ marginTop: 10 }}>
+            <VoiceNote onDone={setVoiceId} />
+            <label className="btn" style={{ cursor: 'pointer' }}>
+              {photoId ? 'Photo added' : 'Add a photo of the knee'}
+              <input type="file" accept="image/*" capture="environment" onChange={onPhoto} style={{ display: 'none' }} />
+            </label>
+          </div>
+          {photoName && <p className="tiny muted">{photoName}</p>}
+          <p className="tiny muted" style={{ marginBottom: 0 }}>
+            Photos go to your physio, who looks at them. The app does not judge a photo.
+          </p>
+        </Card>
+      </details>
 
       {err && <div className="callout urgent small">{err}</div>}
       <button className="btn primary big" onClick={send} disabled={busy || (!symptoms.length && !text.trim() && !voiceId && pain < 4)}>

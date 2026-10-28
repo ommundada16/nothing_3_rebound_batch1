@@ -37,7 +37,7 @@ export default function Session({ state, exerciseId, onExit, toast }) {
   const [step, setStep] = useState('setup'); // setup | live | summary
   const [mode, setMode] = useState('active');
   const [side, setSide] = useState(state.patient.leg || 'left');
-  const [source, setSource] = useState('sim');
+  const [source, setSource] = useState('camera');
   const [facing, setFacing] = useState('environment');
   const [err, setErr] = useState('');
   const [caption, setCaption] = useState(null);
@@ -419,18 +419,19 @@ export default function Session({ state, exerciseId, onExit, toast }) {
     return (
       <div className="stack">
         <div className="row between">
-          <h2 style={{ margin: 0 }}>{cfg.name}</h2>
-          <button className="btn small ghost" onClick={onExit}>
-            Back
+          <button className="link-btn" style={{ textDecoration: 'none' }} onClick={onExit}>
+            ‹ Back
           </button>
         </div>
-        <p className="muted">{cfg.short}</p>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '1.6rem' }}>{cfg.name}</h1>
+          <p className="muted" style={{ margin: '4px 0 0' }}>
+            {cfg.short}
+          </p>
+        </div>
 
-        <Card title="Watch first">
-          <RefVideos refVideos={state.refVideos} exerciseId={exerciseId} />
-        </Card>
-
-        <Card title="How are you doing it today?">
+        <Card>
+          <h3>How are you doing it?</h3>
           <div className="chips" style={{ marginBottom: 8 }}>
             {Object.entries(cfg.modes).map(([id, m]) => (
               <button key={id} className={`chip ${mode === id ? 'on' : ''}`} onClick={() => setMode(id)}>
@@ -442,33 +443,60 @@ export default function Session({ state, exerciseId, onExit, toast }) {
             {cfg.modes[mode].help}
           </p>
           {exerciseId === 'slr' && (
-            <p className="small" style={{ marginTop: 8 }}>
-              Your physio has you on: <b>{stage === 'nopillow' ? 'no pillow' : 'small pillow under the knee'}</b>.
+            <p className="small" style={{ margin: '8px 0 0' }}>
+              {stage === 'nopillow' ? 'No pillow today.' : 'Keep the small pillow under your knee.'}
             </p>
           )}
         </Card>
 
-        <Card title="Set the camera">
-          <p className="small" style={{ marginTop: 0 }}>
-            {cfg.camera}
-          </p>
-          <div className="row wrap" style={{ marginBottom: 8 }}>
-            <div className="chips">
+        {err && (
+          <div className="callout urgent small">
+            {err}
+            {source === 'camera' && (
+              <div style={{ marginTop: 8 }}>
+                <button className="btn small" onClick={() => { setSource('sim'); setErr(''); }}>
+                  Use the simulated leg instead
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <button className="btn primary big" onClick={start} disabled={loadingModel}>
+          {loadingModel ? 'Getting the camera ready…' : 'Start'}
+        </button>
+        <p className="tiny muted" style={{ textAlign: 'center', margin: 0 }}>
+          {planEx.reps} slow reps, hold {planEx.holdSec} seconds. Stop if the pain is sharp.
+        </p>
+
+        <details className="more">
+          <summary>Watch how it is done</summary>
+          <div style={{ marginTop: 8 }}>
+            <RefVideos refVideos={state.refVideos} exerciseId={exerciseId} />
+          </div>
+        </details>
+
+        <details className="more">
+          <summary>Camera settings</summary>
+          <Card tight>
+            <p className="small" style={{ marginTop: 0 }}>
+              {cfg.camera}
+            </p>
+            <label className="field">Use</label>
+            <div className="chips" style={{ marginBottom: 10 }}>
               {[
+                ['camera', 'Camera'],
                 ['sim', 'Simulated leg (demo)'],
-                ['camera', 'Use camera'],
               ].map(([id, label]) => (
                 <button key={id} className={`chip ${source === id ? 'on' : ''}`} onClick={() => setSource(id)}>
                   {label}
                 </button>
               ))}
             </div>
-          </div>
-          {source === 'camera' && (
-            <div className="row wrap small" style={{ gap: 16 }}>
-              <div>
-                <label className="field">Camera</label>
-                <div className="chips">
+            {source === 'camera' && (
+              <>
+                <label className="field">Which camera</label>
+                <div className="chips" style={{ marginBottom: 10 }}>
                   {[
                     ['environment', 'Back'],
                     ['user', 'Front / laptop'],
@@ -478,8 +506,6 @@ export default function Session({ state, exerciseId, onExit, toast }) {
                     </button>
                   ))}
                 </div>
-              </div>
-              <div>
                 <label className="field">Which leg is in view</label>
                 <div className="chips">
                   {[
@@ -492,34 +518,23 @@ export default function Session({ state, exerciseId, onExit, toast }) {
                     </button>
                   ))}
                 </div>
-              </div>
-            </div>
-          )}
-          <p className="tiny muted" style={{ marginBottom: 0 }}>
-            The video is analysed on this device. Nothing is uploaded except the few still pictures you choose to save.
-          </p>
-        </Card>
+              </>
+            )}
+            <p className="tiny muted" style={{ marginBottom: 0 }}>
+              The video is analysed on this device. Only the still pictures you save are sent.
+            </p>
+          </Card>
+        </details>
 
-        <Card tight>
-          <h3>Before you start</h3>
-          <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>
+        <details className="more">
+          <summary>Before you start</summary>
+          <ul className="small" style={{ margin: '6px 0 0', paddingLeft: 18 }}>
             {state.plan.precautions.map((p) => (
               <li key={p}>{p}</li>
             ))}
-            <li>
-              Today: {planEx.reps} slow reps, hold {planEx.holdSec} seconds at the top.
-            </li>
           </ul>
-        </Card>
-
-        {!hasClips && (
-          <div className="callout review small">Your physio has not recorded voice cues yet, so you will hear a plain placeholder voice. His own voice will play once he adds it.</div>
-        )}
-        {err && <div className="callout urgent small">{err}</div>}
-
-        <button className="btn primary big" onClick={start} disabled={loadingModel}>
-          {loadingModel ? 'Loading…' : 'Start with my physio'}
-        </button>
+          {!hasClips && <p className="tiny muted">Your physio has not recorded his voice yet, so you will hear a plain placeholder voice for now.</p>}
+        </details>
       </div>
     );
   }

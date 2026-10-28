@@ -114,98 +114,79 @@ function Today({ state, now, store, setSession, setTab, dueFollowUps, toast }) {
   const { refresh } = store;
   const dp = dayPostOp(now(), state.patient.surgeryTs);
   const todays = sessionsToday(state.sessions, now());
-  const [open, setOpen] = useState(null);
   const hour = new Date(now()).getHours();
   const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const doneCount = state.plan.exercises.filter((pe) => todays.some((s) => s.exercise === pe.id)).length;
 
   const callPhysio = async () => {
     if (!window.confirm('Ask your physio to call you? They will be alerted straight away.')) return;
-    const r = await api.reportIssue({ symptoms: [], pain: 0, text: 'I am worried and would like my physio to call me.', callRequest: true });
+    await api.reportIssue({ symptoms: [], pain: 0, text: 'I am worried and would like my physio to call me.', callRequest: true });
     await refresh();
     toast.show('Your physio has been asked to call you.');
-    return r;
   };
 
   return (
     <div className="stack">
       <div>
-        <p className="muted small" style={{ margin: 0 }}>
-          {state.patient.name}
-        </p>
-        <h1 style={{ margin: 0 }}>{greet}</h1>
+        <h1 style={{ margin: 0, fontSize: '1.7rem' }}>{greet}</h1>
         <p className="muted" style={{ margin: 0 }}>
-          Day {dp} after your surgery · {state.patient.procedure}
+          Day {dp} of your recovery
         </p>
       </div>
 
       <FollowUps items={dueFollowUps} refresh={refresh} toast={toast} />
 
-      <h2 style={{ margin: '4px 0 0' }}>Today's exercises</h2>
-      {state.plan.exercises.map((pe) => {
-        const cfg = EXERCISES[pe.id];
-        const done = todays.filter((s) => s.exercise === pe.id);
-        const doneModes = [...new Set(done.map((s) => s.mode))];
-        return (
-          <Card key={pe.id}>
-            <div className="row between">
-              <div className="grow">
-                <h3 style={{ margin: 0 }}>{cfg.name}</h3>
-                <p className="small muted" style={{ margin: 0 }}>
-                  {pe.reps} slow reps · hold {pe.holdSec} s{pe.id === 'slr' ? ` · ${pe.stage === 'nopillow' ? 'no pillow' : 'small pillow under the knee'}` : ''}
-                </p>
-              </div>
-              {doneModes.length ? <span className="badge ok">Done today</span> : <span className="badge plain">To do</span>}
-            </div>
-            <div className="row wrap" style={{ margin: '8px 0' }}>
-              {Object.entries(cfg.modes).map(([id, m]) => (
-                <span key={id} className={`badge ${doneModes.includes(id) ? 'ok' : 'plain'}`}>
-                  {m.label} {doneModes.includes(id) ? '✓' : ''}
-                </span>
-              ))}
-            </div>
-            <div className="row">
-              <button className="btn primary grow" onClick={() => setSession(pe.id)}>
-                <span className="row" style={{ justifyContent: 'center' }}>
-                  <Icon name="play" size={16} /> Practise with my physio
-                </span>
-              </button>
-              <button className="btn" onClick={() => setOpen(open === pe.id ? null : pe.id)}>
-                {open === pe.id ? 'Hide videos' : 'Watch'}
-              </button>
-            </div>
-            {open === pe.id && (
-              <div style={{ marginTop: 12 }}>
-                <RefVideos refVideos={state.refVideos} exerciseId={pe.id} />
-              </div>
-            )}
-          </Card>
-        );
-      })}
+      <Card>
+        <div className="row between" style={{ marginBottom: 2 }}>
+          <h2 style={{ margin: 0 }}>Today</h2>
+          <span className="small muted">
+            {doneCount} of {state.plan.exercises.length} done
+          </span>
+        </div>
+        {state.plan.exercises.map((pe) => {
+          const cfg = EXERCISES[pe.id];
+          const done = todays.some((s) => s.exercise === pe.id);
+          return (
+            <button key={pe.id} className="row-link" onClick={() => setSession(pe.id)}>
+              <span className={`dot ${done ? 'done' : ''}`}>{done ? '✓' : ''}</span>
+              <span>
+                <div className="title">{cfg.name}</div>
+                <div className="small muted">
+                  {pe.reps} reps · hold {pe.holdSec} seconds
+                </div>
+              </span>
+              <span className="chev" aria-hidden="true">
+                ›
+              </span>
+            </button>
+          );
+        })}
+      </Card>
 
-      <div className="grid">
-        <button className="btn big" onClick={() => setTab('help')}>
-          <span className="row" style={{ justifyContent: 'center' }}>
-            <Icon name="alert" size={20} /> Something feels wrong
-          </span>
-        </button>
-        <button className="btn big" onClick={callPhysio}>
-          <span className="row" style={{ justifyContent: 'center' }}>
-            <Icon name="phone" size={20} /> I am worried. Ask my physio to call me
-          </span>
+      <div style={{ textAlign: 'center' }}>
+        <button className="link-btn" onClick={() => setTab('help')}>
+          Something feels wrong?
         </button>
       </div>
 
-      <FamilyHelp state={state} now={now} refresh={refresh} toast={toast} />
-
-      <Card title="Remember" tight>
-        <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>
-          {state.plan.precautions.map((p) => (
-            <li key={p}>{p}</li>
-          ))}
-          {state.plan.notes && <li>{state.plan.notes}</li>}
-        </ul>
-      </Card>
-      <p className="tiny muted">Last seen by your physio team: {relTime(now() - 26 * 3600 * 1000, now())}. Demo data is synthetic.</p>
+      <details className="more">
+        <summary>More</summary>
+        <div className="stack" style={{ marginTop: 6 }}>
+          <button className="btn" onClick={callPhysio}>
+            I am worried. Ask my physio to call me
+          </button>
+          <FamilyHelp state={state} now={now} refresh={refresh} toast={toast} />
+          <Card tight>
+            <h3>Remember</h3>
+            <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>
+              {state.plan.precautions.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+              {state.plan.notes && <li>{state.plan.notes}</li>}
+            </ul>
+          </Card>
+        </div>
+      </details>
     </div>
   );
 }
@@ -260,7 +241,9 @@ function Progress({ state, now }) {
         )}
       </Card>
 
-      <Card title="Keeping the knee straight when you lift (leg raise)">
+      <details className="more">
+        <summary>Leg raise progress</summary>
+      <Card title="Keeping the knee straight when you lift">
         <LineChart
           series={[
             { name: 'On your own', color: '#0f766e', points: slr.active },
@@ -274,6 +257,7 @@ function Progress({ state, now }) {
           Lower is better here: it shows how far from straight the knee is at the top of the lift. A small lag between the two lines is common while the thigh muscle wakes up.
         </p>
       </Card>
+      </details>
     </div>
   );
 }

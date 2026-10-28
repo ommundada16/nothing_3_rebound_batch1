@@ -72,13 +72,18 @@ export default function App() {
             </span>
             Physio Twin
           </div>
-          <nav className="roles" aria-label="Choose a view">
-            {ROLES.map((r) => (
-              <button key={r.id} className={`role-btn ${role === r.id ? 'active' : ''}`} onClick={() => setRole(r.id)}>
-                {r.label}
-              </button>
-            ))}
-          </nav>
+          <label className="view-select-wrap" style={{ marginLeft: 'auto' }}>
+            <span className="tiny muted" style={{ marginRight: 6 }}>
+              View as
+            </span>
+            <select className="view-select" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Switch between patient, physio, care chain, family and future views">
+              {ROLES.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </header>
 

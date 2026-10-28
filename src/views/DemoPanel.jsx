@@ -43,7 +43,7 @@ export default function DemoPanel({ store, setRole }) {
   return (
     <>
       <button className="demo-fab" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-        {open ? 'Close demo' : 'Demo controls'}
+        {open ? 'Close' : 'Demo'}
       </button>
       {open && (
         <div className="card demo-panel stack">
