@@ -1,3 +1,21 @@
+# Update — 29 October: real camera and bend restrictions
+
+- User will test first with the laptop webcam. Front/laptop camera is now the default. Use Chrome/Edge at http://localhost:8787 and allow the camera; no LAN HTTPS is needed for this laptop-local test.
+- Fixed the camera startup ordering: acquire stream, load model, render live video, wait for the video element, then attach/play and run inference. Late-acquired streams are stopped after cancellation; permission requests have a 20-second timeout with an actionable message.
+- MediaPipe full model is downloaded by npm run setup (and npm install). Model/runtime are ignored generated assets; run setup on another checkout before testing.
+- Physio Plan now has optional doctor maxFlexion and targetFlexion fields. NO 90-degree limit has been set for the user's real patient. Ninety degrees is only a fictional test setting in tmp/review-data. Warnings begin 5 degrees before a prescribed maximum; repetition targets must stay at least 5 degrees below it.
+- Two new reusable cue slots: near_limit and angle_limit. Real physio recordings are preferred. Missing clips use a system voice that names the prescribed limit.
+- Warning cues interrupt encouragement. Raw and smoothed angles are considered for warning timing. Hysteresis prevents frame-to-frame warning spam. A repetition that crosses the estimated maximum is not counted as complete.
+- Missing landmarks or a stalled frame stream invalidate the partial rep and require returning to the starting position. Unobserved time cannot count as a hold.
+- Peak stills now use the current frame's landmarks. Images are uploaded only on Save. Warning events and the limit used are included in a saved session.
+- Sessions with fewer than ten accepted frames or less than 60% accepted frames cannot be saved as a zero-angle measurement. These are engineering gates, not clinical validation. Patient/family task completion now requires the prescribed number of full reps, rather than any session record.
+- Verified: 39 unit tests; production build; clinician limit field save; camera-permission timeout message; actual model inference on the supplied human reference clip; camera stream lifecycle through an isolated recorded-video-as-camera QA fixture.
+- Important limit: the in-app preview did not grant physical webcam access. Do NOT claim a physical human webcam session or angle accuracy was validated. The provided close-up clip had very poor visibility in both lite and full models; use torso/hip/knee/ankle side-on framing. Physical testing against a goniometer and audio audibility are still required.
+- Temporary QA fixtures were generated only in ignored dist/ and removed by the final production build. Test patient/physio settings stayed in ignored tmp/review-data, not the user's real saved data.
+- Full explanation and open-source references: docs/CAMERA_TRACKING.md. No unrelated GitHub rep-counter code was copied. Rebound uses official MediaPipe plus its own heel-slide and limit rules.
+
+---
+
 # Update — Rebound exercise simplification
 
 - Product name in the app and browser title is now Rebound (repository folder unchanged).
