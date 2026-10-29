@@ -1,3 +1,12 @@
+## Follow-up fixes — 29 October 2026
+
+- Each heel-slide mode has a separate prescription card and optional modeSettings overrides (reps, hold, maximum). shared/exercises.js exercisePrescription resolves inherited defaults; patient tasks, sessions, family completion and server live-alert checks use the appropriate mode. Existing plans need no migration.
+- Session now uses LockedLegTracker: acquire a side automatically once, never switch on a visibility advantage, and reject abrupt joint displacement on that same label. Hidden/uncertain leg pauses; no invented angle for occluded joints. This reduces rear-leg takeover but cannot guarantee anatomical identity if the pose model slowly mislabels overlapping legs.
+- RepCounter accepts slow movement starts, restarts hold timing if bending continues, and requires a sustained fall before early-release detection. Existing tracking-loss and prescribed-limit exclusions remain. No 90-degree measurement cap exists; the angle math/regression goes to 130 degrees. Do not exceed a doctor's restriction for testing.
+- Physio Summary now includes saved practice sessions with knee/status, timestamp and reps, plus a recent saved-session list. Real saved entries take precedence over seeded data. Clinical completion/objective flags still exclude other-knee practice. Surgery record remains unchanged.
+- Refresh on tab selection, window focus and visibility return; no-store requests and stale-revision protection supplement existing polling.
+- Verified: 55 unit tests; build; isolated API checks for separate mode limits and saved-session visibility; physical webcam accuracy still unverified.
+
 ## Latest simplification — 29 October 2026
 
 This section overrides earlier UI/OCR/side-selection descriptions below.

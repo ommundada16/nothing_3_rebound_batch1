@@ -1,3 +1,7 @@
+## Current tracker update — 29 October 2026
+
+Session now uses LockedLegTracker, not visibility-based side switching. It acquires a side once and checks joint-position continuity. A hidden leg or abrupt same-label jump pauses measurement instead of following the exposed rear leg. It does not reconstruct occluded joints. Very slow starts are admitted by RepCounter; continuing to bend restarts hold timing, while a short noisy dip no longer instantly ends the hold. The existing prescribed-limit exclusion remains. Synthetic tests cover a gradual 130-degree bend with the rear leg becoming more visible, loss/label jumps, and full slow repetitions beyond 90 degrees. These tests are not clinical webcam validation. See HANDOFF.md for separate mode prescriptions and Summary visibility fixes.
+
 ## Latest simplification — 29 October 2026
 
 This section overrides earlier UI/OCR/side-selection descriptions below.

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 async function req(method, url, body) {
   const res = await fetch(url, {
     method,
+    cache: 'no-store',
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -50,7 +51,7 @@ export function useStore(enabled = true) {
   const refresh = useCallback(async () => {
     try {
       const j = await api.get(`/api/state?since=${rev.current}`);
-      if (!j.unchanged) {
+      if (!j.unchanged && j.rev >= rev.current) {
         rev.current = j.rev;
         fetchedAt.current = Date.now();
         setState(j.state);
@@ -65,7 +66,9 @@ export function useStore(enabled = true) {
     if (!enabled) { rev.current = 0; setState(null); return; }
     refresh();
     const t = setInterval(refresh, 1500);
-    return () => clearInterval(t);
+    const wake=()=>{if(document.visibilityState==='visible')refresh();};
+    window.addEventListener('focus',wake);document.addEventListener('visibilitychange',wake);
+    return () => {clearInterval(t);window.removeEventListener('focus',wake);document.removeEventListener('visibilitychange',wake);};
   }, [refresh, enabled]);
 
   // "Now" on the server's (possibly demo-advanced) clock.
