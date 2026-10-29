@@ -1,3 +1,9 @@
+## Current care-team workflow
+
+Patients sign in with an account created by the care team. Staff can register as Care team or Assistant surgeon to enrol and assign patients; physiotherapists register their own account and service area. Existing patient accounts and history are retained.
+
+Both patient and physio can open Sessions for full recording details and Progress for actual saved camera readings. The care team directory manages enrolment, physio assignments and proposed robot update queues. These queues do not imply connected hardware or installed firmware. See HANDOFF.md for the current architecture and prototype limitations.
+
 ## Latest simplification — 29 October 2026
 
 This section overrides earlier UI/OCR/side-selection descriptions below.
