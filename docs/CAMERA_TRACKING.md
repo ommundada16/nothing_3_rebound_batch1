@@ -1,3 +1,15 @@
+# Tracking update: explicit knee selection and quiet speech
+
+The user tested the right knee from the side, but the previous setup silently defaulted to the left knee from the patient record. Select the measured knee using the new prominent Left/Right buttons. The preference is remembered per browser origin; the operated side is unchanged. Other-knee tests do not count as operated-knee recovery.
+
+Visibility is now an engineering heuristic combined with geometric and temporal checks. The earlier strict 0.65 threshold is no longer used as a hard gate: coherent samples at 0.35 or higher can be used, while out-of-frame limbs and sudden one-frame angle jumps are rejected. This does not establish clinical accuracy. Brief gaps pause the hold timer; longer loss invalidates the rep.
+
+Speech uses one active sentence, drops obsolete ordinary cues, and queues at most one still-relevant bend warning. It does not interrupt a sentence merely because a movement phase changes. On-screen warnings remain immediate. Repeated push loops, angle narration and spoken second counts were removed.
+
+The technical notes below describe earlier verification and remain historical evidence, not proof that the latest tracker is clinically validated.
+
+---
+
 # Rebound local camera tracking
 
 Uses the full MediaPipe pose model with the already-installed @mediapipe/tasks-vision 0.10.21 (Apache-2.0).

@@ -1,3 +1,21 @@
+# Update — simpler care roles, local medicine OCR and quieter tracking
+
+This update takes precedence over older design notes below.
+
+- Physio home now shows assigned patients only. Open a patient for a plain Summary, Exercise plan, Messages and Daily care. Graph-heavy overview is no longer displayed. Voice/video/routing/measurement tools are under More tools. Demo controls require ?demo=1.
+- A fourth account role, assistant (Assistant surgeon), can register/sign in. It has its own assigned-patient home and a First two weeks appointment template. The assistant enters surgery date plus selected appointment dates/optional times; dates are not automatically prescribed or booked. Saved dates share through the existing server state to patient/family/physio. Server allows this staff role to edit care/patient data and review issues, and forces its replies to care level 3.
+- Still one real care group / one assigned patient in this prototype. No fake multiple-patient directory or multi-clinic assignment is claimed.
+- Patient/family food logging and typed support forms were removed. Food, equipment and support guidance is now inline with original local SVG illustrations; no outbound information links are shown. Diet suggestions are general and do not diagnose deficiencies. Existing care-team protein targets can be displayed, but no patient food/protein entry is required.
+- Medicine concerns use Take/upload photo plus optional symptom buttons. Tesseract.js 6 reads English label text locally, using worker/core/language files copied into public/ocr by npm run setup. Those files are ignored generated assets. First-run OCR may take time; an unreadable label can still be sent with the original photo.
+- Native barcode reading is attempted only if the browser supports BarcodeDetector. No drug-database lookup or automatic medicine suitability/side-effect diagnosis is claimed. Original photo, unverified OCR and any barcode are stored on the issue and shown to the physio and assistant surgeon. OCR text is NOT fed into symptom triage as if it were the patient's reported symptoms.
+- User confirmed their tracking test was a SIDE VIEW of the RIGHT knee. Previous default was LEFT from the synthetic surgery plan. New large Left knee / Right knee buttons are directly on the exercise setup page, the selected side appears live, and the preference is remembered on that device. It does not change the surgery record. A different-knee session is saved as a test and excluded from recovery completion/objective flags.
+- Tracker now combines a 0.35 landmark visibility heuristic with in-frame, limb-geometry and temporal-jump checks, instead of rejecting every sample below 0.65. Brief missing intervals up to 500 ms pause holding time; prolonged loss invalidates the partial rep. This is an availability/stability change, not proof of clinical angle accuracy. Physical right-knee testing is still needed on the user's laptop.
+- Voice never cancels an active sentence for a new movement cue. Ordinary stale cues are dropped. A still-current bend warning may be next after the sentence finishes; outdated warnings are discarded. Removed repeating push/angle narration, spoken hold counts and repeated stalled prompts. Camera guidance is spoken once per loss episode and rearmed only after stable recovery. Explicit Stop/Mute still stops sound.
+- Verified: 45 unit tests; production build; four-account API checks (including assistant permissions and appointment edits); browser assigned-patient home, plain patient summary, guardian suggestions with ZERO external links and ZERO food input fields, successful local OCR of a synthetic medicine label, original image plus OCR visible in the assistant's message view, and successful browser save of the first-fortnight date plan. Date/time controls use onInput for reliable embedded-browser events.
+- Generated OCR assets need npm run setup after a fresh clone. Test data and synthetic label files were kept in ignored tmp/review-data and tmp/. No real prescription or surgery dates were changed by tests.
+
+---
+
 # Update — 29 October: real camera and bend restrictions
 
 - User will test first with the laptop webcam. Front/laptop camera is now the default. Use Chrome/Edge at http://localhost:8787 and allow the camera; no LAN HTTPS is needed for this laptop-local test.
