@@ -979,3 +979,11 @@ h1 { font-size:1.85rem; } h2 { font-size:1.4rem; } h3 { font-size:1.15rem; }
 @media(min-width:900px){.exercise-setup{max-width:none}.reference-video video{max-height:55vh;object-fit:contain}}
 
 @media(max-width:700px){.topbar-inner{flex-wrap:wrap;height:auto;min-height:56px;padding-top:8px;padding-bottom:8px}.topbar-inner .badge.plain{font-size:.62rem;max-width:100px;white-space:normal;text-align:center}.topbar-inner .brand{font-size:1rem}.header-vision{font-size:.7rem}}
+
+/* Emphasise appointment and assigned-physio section headings. */
+.care-heading-card > .row:first-child > h3 {
+  font-size: clamp(1.5rem, 2.3vw, 2rem);
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--ink, #234338);
+}
