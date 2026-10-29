@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { CuePlayer } from '../lib/cues.js';
 import { Smoother, bestSide, flexionFrom, liftFrom, readLeg } from '../lib/geometry.js';
 import { detect, loadPose, openCamera } from '../lib/pose.js';
+import { AngleGuard } from '../lib/angleGuard.js';
 import { RepCounter } from '../lib/repCounter.js';
 import { SIM_H, SIM_W, createSim, drawScene } from '../lib/sim.js';
 import { Card, Icon } from '../components/ui.jsx';
@@ -15,6 +16,7 @@ const PHASE_TEXT = {
   moving: 'Moving. Keep going.',
   holding: 'Hold it there.',
   released: 'Relax and come back.',
+  recovering: 'Tracking paused. Gently return to the starting position.',
 };
 
 function simProfile(state, exerciseId, mode) {
@@ -33,6 +35,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
   const cfg = EXERCISES[exerciseId];
   const planEx = state.plan.exercises.find((e) => e.id === exerciseId) || { reps: 8, holdSec: 3 };
   const stage = planEx.stage || null;
+  const maxFlexion = Number(planEx.maxFlexion) > 0 ? Number(planEx.maxFlexion) : null;
 
   const [step, setStep] = useState('setup'); // setup | live | summary
   const [mode] = useState(initialMode);
@@ -65,6 +68,9 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     clearTimeout(rafRef.current);
     if (r.pushTimer) clearInterval(r.pushTimer);
     if (r.capTimer) clearTimeout(r.capTimer);
+    r.resolveVideo?.(null); r.resolveVideo=null;
+    for(const timer of r.timers || []) clearTimeout(timer);
+    r.timers=[];
     r.cues?.stop();
     if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel();
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -72,6 +78,17 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     r.running = false;
   }, []);
   useEffect(() => stopAll, [stopAll]);
+  useEffect(() => {
+    if(step === 'live' && videoRef.current && run.current.resolveVideo) {
+      run.current.resolveVideo(videoRef.current); run.current.resolveVideo=null;
+    }
+  }, [step]);
+  const later = (fn, ms) => {
+    const r=run.current;
+    const timer=setTimeout(()=>{if(r.running)fn();},ms);
+    r.timers.push(timer);
+  };
+  const canEncourage = () => {const r=run.current;return r.running && !r.guardStatus?.blocked && !r.lowSince && performance.now()-(r.lastValidFrame ?? -Infinity)<350;};
 
   // ---------- helpers ----------
   const compose = useCallback(
@@ -123,16 +140,20 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     setErr('');
     const r = run.current;
     r.shots = [];
+    r.timers=[]; r.finishing=false; r.lastVT=null; r.selectedSide=null;
+    r.guard=new AngleGuard({maxFlexion,margin:Number(planEx.warningMarginDeg)||5});
+    r.guardStatus={state:'unknown',blocked:true};
+    r.limitEvents=[]; r.observedPeak=null;
     r.repDeficits = [];
     r.curDeficits = [];
     r.confSum = 0;
-    r.confN = 0;
+    r.confN = 0; r.validN=0; r.lastAngleSpoken=0; r.lastMilestone=0;
     r.lowSince = null;
     r.lastSpeak = 0;
     r.lastUi = 0;
     r.source = source;
     r.running = true;
-    r.startedAt = Date.now();
+    r.startedAt = Date.now(); r.startedPerf=performance.now(); r.lastValidFrame=null;
     r.firstRepStarted = false;
     r.smoother = new Smoother(0.35);
     r.cues = new CuePlayer({
@@ -148,7 +169,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
 
     r.counter = new RepCounter({
       base: cfg.base,
-      minPeak: cfg.minPeak,
+      minPeak: Number(planEx.targetFlexion) > 0 ? Number(planEx.targetFlexion) : Math.min(cfg.minPeak, maxFlexion ? maxFlexion-10 : cfg.minPeak),
       holdMs: planEx.holdSec * 1000,
       onEvent: (e) => handleEvent(e),
     });
@@ -156,10 +177,15 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     try {
       if (source === 'camera') {
         setLoadingModel(true);
-        const [stream, landmarker] = await Promise.all([openCamera(facing), loadPose()]);
+        const stream = await openCamera(facing);
+        if(!r.running) {stream.getTracks().forEach(t=>t.stop());return;}
         streamRef.current = stream;
-        r.landmarker = landmarker;
-        const v = videoRef.current;
+        r.landmarker = await loadPose();
+        if(!r.running)return;
+        const mounted = new Promise(resolve => { r.resolveVideo=resolve; });
+        setStep('live');
+        const v = await mounted;
+        if(!v || !r.running)return;
         v.srcObject = stream;
         await v.play();
         r.w = v.videoWidth;
@@ -181,7 +207,8 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
       }
     } catch (e) {
       setLoadingModel(false);
-      setErr(e.message || 'Could not start the camera. You can use the simulated leg instead.');
+      setStep('setup');
+      setErr(e.name === 'NotAllowedError' ? 'Camera access was blocked. Allow camera access for this site, then try again.' : e.name === 'NotFoundError' ? 'No camera was found. Connect a webcam or use your phone.' : e.message || 'Could not start the camera. You can use the demo animation instead.');
       stopAll();
       return;
     }
@@ -197,46 +224,51 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     const cues = r.cues;
     switch (e.type) {
       case 'start':
+        r.lastMilestone=0;
         if (!r.firstRepStarted) {
           r.firstRepStarted = true;
           cues.play('start', { priority: true });
         }
         if (r.pushTimer) clearInterval(r.pushTimer);
-        setTimeout(() => cues.play('push'), 600);
+        later(() => {if(canEncourage())cues.play('push');}, 600);
         r.pushTimer = setInterval(() => {
-          if (r.counter.state === 'moving') cues.play('push');
+          if (r.counter.state === 'moving' && canEncourage()) cues.play('push');
         }, 2600);
         r.curDeficits = [];
+        break;
+      case 'tracking_lost':
+        clearInterval(r.pushTimer); r.cues.stop();
+        if(typeof speechSynthesis !== 'undefined')speechSynthesis.cancel();
         break;
       case 'abort':
         clearInterval(r.pushTimer);
         break;
       case 'peak':
         clearInterval(r.pushTimer);
-        cues.play('hold', { priority: true });
+        if(canEncourage())cues.play('hold', { priority: true });
         snap(e.value);
         break;
       case 'hold_tick':
-        if (!cues.hasRealClip('hold')) cues.speak(String(e.sec));
+        if (canEncourage() && !cues.hasRealClip('hold')) cues.speak(String(e.sec));
         if (e.sec === 1) snap(r.counter.holdPeak);
         break;
       case 'release':
-        cues.play('relax', { priority: true });
+        if(!r.guardStatus?.blocked)cues.play('relax', { priority: true });
         pushDeficit();
         break;
       case 'early_release':
-        cues.play('again', { priority: true });
+        if(canEncourage())cues.play('again', { priority: true });
         pushDeficit();
         break;
       case 'stalled':
-        cues.play('again');
+        if(canEncourage())cues.play('again');
         break;
       case 'rep_done':
-        if (e.complete) setTimeout(() => cues.play('good'), 1500);
+        if (e.complete) later(() => {if(canEncourage()){cues.play('good');}}, 1500);
         if (r.counter.completed >= planEx.reps && !r.finishing) {
           r.finishing = true;
-          setTimeout(() => cues.play('done', { priority: true }), 2600);
-          setTimeout(() => finish(), 5200);
+          later(() => cues.play('done', { priority: true }), 2600);
+          later(() => finish(), 5200);
         }
         break;
       default:
@@ -287,6 +319,10 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
           landmarks = null;
         }
       } else {
+        if(now-(r.lastValidFrame ?? r.startedPerf)>350) {
+          r.counter.update(null,now);r.guardStatus=r.guard.update(null,now);
+          if(now-r.lastUi>250){r.lastUi=now;setLive(v=>({...v,value:null,conf:0,low:true,tick:0,phase:r.counter.state,guard:'unknown'}));}
+        }
         schedule();
         return;
       }
@@ -300,26 +336,51 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
       }
     }
 
-    const useSide = side === 'auto' ? bestSide(landmarks, LEG) : side;
+    const useSide = side === 'auto' ? (r.selectedSide || bestSide(landmarks, LEG)) : side;
     const leg = readLeg(landmarks, LEG[useSide], w, h);
     const conf = leg ? leg.confidence : 0;
     r.confSum += conf;
     r.confN += 1;
-    const ok = leg && conf >= 0.5;
+    const ok = leg && conf >= 0.65 && [leg.hip,leg.knee,leg.ankle].every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.x>=0&&p.x<=w&&p.y>=0&&p.y<=h);
 
     let value = null;
     if (ok) {
+      r.validN+=1; r.lastValidFrame=now;
       const raw = cfg.signal === 'flexion' ? flexionFrom(leg.hip, leg.knee, leg.ankle) : liftFrom(leg.hip, leg.knee);
+      if(!r.selectedSide)r.selectedSide=useSide;
       value = r.smoother.push(raw);
-      r.counter.update(value, now);
       r.lastPose = { hip: leg.hip, knee: leg.knee, ankle: leg.ankle };
+      r.observedPeak = Math.max(r.observedPeak ?? 0,value);
+      const guard=r.guard.update(Math.max(raw,value),now);
+      r.guardStatus=guard;
+      if(guard.speak) {
+        clearInterval(r.pushTimer);
+        const tag=guard.state === 'limit' ? 'angle_limit' : 'near_limit';
+        r.cues.play(tag,{priority:true});
+        if(!r.cues.hasRealClip(tag)) {
+          const text=guard.state === 'limit' ? `Your prescribed maximum is ${maxFlexion} degrees. Stop bending. Do not go past this. Gently release.` : `You are close to your ${maxFlexion} degree limit. Do not bend further.`;
+          r.cues.speak(text);setCaption({tag,text,source:'system'});
+        }
+        r.limitEvents.push({state:guard.state,angle:Math.round(raw),atMs:Math.round(now-r.startedPerf)});
+        if(guard.state === 'limit')snap(value);
+      }
+      r.counter.update(value, now);
+      if(guard.state === 'limit')r.counter.invalidateLimit();
+      const milestone=Math.floor(value/15)*15;
+      if(!guard.blocked && r.counter.state === 'moving' && milestone>r.lastMilestone && milestone>=30 && now-r.lastAngleSpoken>8000 && now>r.cues.busyUntil) {
+        r.lastMilestone=milestone;r.lastAngleSpoken=now;
+        r.cues.speak(`${milestone} degrees. Keep your movement gentle.`);
+        r.cues.busyUntil=now+3500;
+      }
       if (cfg.signal === 'lift' && r.counter.state === 'holding') {
         const d = flexionFrom(leg.hip, leg.knee, leg.ankle);
         if (d != null) r.curDeficits.push(d);
       }
       r.lowSince = null;
-    } else if (r.lowSince == null) {
-      r.lowSince = now;
+    } else {
+      r.counter.update(null,now); r.smoother.reset();
+      r.guardStatus=r.guard.update(null,now);
+      if(r.lowSince == null)r.lowSince=now;
     }
     const low = !ok && r.lowSince != null && now - r.lowSince > 900;
     if (low && now - r.lastSpeak > 9000) {
@@ -345,7 +406,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         done: r.counter.completed,
         tick: r.counter.state === 'holding' ? Math.min(planEx.holdSec, (now - r.counter.holdStart) / 1000) : 0,
         conf,
-        low,
+        low, guard:r.guardStatus.state,
       });
     }
     schedule();
@@ -359,14 +420,15 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     const reps = r.counter.reps;
     const good = reps.filter((x) => x.complete);
     const pool = good.length ? good : reps;
-    const peak = pool.length ? Math.max(...pool.map((x) => x.peak)) : 0;
+    const peak = r.validN < 10 || r.validN / Math.max(1,r.confN) < 0.6 ? null : pool.length ? Math.max(...pool.map((x) => x.peak)) : r.observedPeak;
     const deficits = r.repDeficits;
     const deficit = cfg.signal === 'lift' && deficits.length ? Math.round((deficits.reduce((a, b) => a + b, 0) / deficits.length) * 10) / 10 : null;
     setSummary({
       reps,
-      peak: Math.round(peak * 10) / 10,
+      peak: peak == null ? null : Math.round(peak * 10) / 10,
       deficit,
       shots: r.shots,
+      validRatio:r.validN / Math.max(1,r.confN),
       confidenceAvg: r.confN ? Math.round((r.confSum / r.confN) * 100) / 100 : 0,
       seconds: Math.round((Date.now() - r.startedAt) / 1000),
     });
@@ -385,7 +447,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
       const res = await api.saveSession({
         exercise: exerciseId,
         mode,
-        leg: side === 'auto' ? state.patient.leg : side,
+        leg: run.current.selectedSide || side,
         stage,
         reps: summary.reps,
         metrics: { peak: summary.peak, deficit: summary.deficit },
@@ -394,6 +456,8 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         screenshotIds: ids,
         selfReport: self,
         durationS: summary.seconds,
+        prescribedMaxFlexion:maxFlexion,
+        limitEvents:run.current.limitEvents,
       });
       toast(res.newFlags?.length ? 'Saved. Your physio has been sent a summary to look at.' : 'Saved. Well done.');
       onExit();
@@ -423,6 +487,8 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         <RefVideos refVideos={state.refVideos} exerciseId={exerciseId} mode={mode} />
         <p className="exercise-prescription"><b>{planEx.reps} repetitions</b> · Hold for <b>{planEx.holdSec} seconds</b></p>
         <p>Move gently. Stop if you feel sharp pain.</p>
+        {source === 'camera' && <p className="small muted">Place the camera at your side. Keep your torso, hip, knee and ankle in view—not just your knee.</p>}
+        {maxFlexion && <p className="callout review">Prescribed maximum: <b>{maxFlexion}°</b>. The app warns before this estimated angle. Follow your doctor’s restriction.</p>}
         {err && <div className="callout urgent" role="alert">{err}</div>}
         <button className="btn primary big" onClick={start} disabled={loadingModel}>{loadingModel ? 'Getting ready…' : 'Start exercise'}</button>
         <details className="more"><summary>Camera and practice options</summary>
@@ -448,7 +514,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         <Card>
           <div className="row between" style={{ textAlign: 'center' }}>
             <div className="grow">
-              <div style={{ fontSize: '2.2rem', fontWeight: 800 }}>{Math.round(summary.peak)}°</div>
+              <div style={{ fontSize: '2.2rem', fontWeight: 800 }}>{summary.peak == null ? 'Unavailable' : `${Math.round(summary.peak)}°`}</div>
               <div className="small muted">{cfg.signal === 'flexion' ? 'Best bend' : 'Best lift'}</div>
             </div>
             <div className="grow">
@@ -465,12 +531,12 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
             )}
           </div>
           <p className="tiny muted" style={{ marginBottom: 0 }}>
-            Camera estimate of {summary.confidenceAvg >= 0.8 ? 'good' : 'fair'} tracking quality ({Math.round(summary.confidenceAvg * 100)}%). Good for tracking your own trend, not a clinical measurement.
+            Your leg was visible enough in {Math.round(summary.validRatio * 100)}% of camera frames. This does not measure angle accuracy.
           </p>
         </Card>
 
         {summary.shots.length > 0 && (
-          <Card title="Your best moments (sent to your physio)">
+          <Card title="Exercise pictures (shared when you save)">
             <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))' }}>
               {summary.shots.map((s, i) => (
                 <img key={i} className="shot" src={s.url} alt={`Peak ${Math.round(s.value)} degrees`} />
@@ -479,6 +545,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
           </Card>
         )}
 
+        {summary.peak == null && <div className="callout review">No usable measurement was recorded. Reposition the camera so the hip, knee and ankle are visible, then try again.<button className="btn" onClick={()=>setStep('setup')}>Try again</button></div>}
         <Card title="How was it?">
           <label className="field">Pain during the exercise: {self.pain} / 10</label>
           <input type="range" min="0" max="10" value={self.pain} onChange={(e) => setSelf({ ...self, pain: +e.target.value })} />
@@ -493,7 +560,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
           <button className="btn grow" onClick={onExit}>
             Discard
           </button>
-          <button className="btn primary grow" onClick={save} disabled={saving}>
+          <button className="btn primary grow" onClick={save} disabled={saving || summary.peak == null}>
             {saving ? 'Saving…' : 'Save session'}
           </button>
         </div>
@@ -506,6 +573,8 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
   const holdPct = Math.min(1, live.tick / planEx.holdSec);
   return (
     <div className="stack">
+      {loadingModel && <p className="callout" role="status">Opening your camera…</p>}
+      {maxFlexion && <div className={`callout ${live.guard === 'limit' ? 'urgent' : 'review'}`} role="status">{live.guard === 'limit' ? `Stop bending. Prescribed maximum ${maxFlexion}°. Gently release.` : live.guard === 'near' ? `Near your ${maxFlexion}° limit. Do not bend further.` : `Prescribed maximum: ${maxFlexion}° · Camera estimate`}</div>}
       <div className={`stage ${source === 'camera' && facing === 'environment' ? '' : ''}`} style={{ aspectRatio: aspect }}>
         <div className={source === 'camera' && facing === 'user' ? 'mirror' : ''} style={{ position: 'absolute', inset: 0 }}>
           <video ref={videoRef} playsInline muted style={{ display: source === 'camera' ? 'block' : 'none' }} />
@@ -535,7 +604,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
       <Card tight>
         <div className="row between">
           <div className="grow">
-            <div style={{ fontWeight: 700 }}>{PHASE_TEXT[live.phase]}</div>
+            <div style={{ fontWeight: 700 }}>{live.guard === 'limit' || live.guard === 'near' ? 'Do not bend further. Follow your prescribed limit.' : PHASE_TEXT[live.phase]}</div>
             <div className="small muted">
               {mode === 'assisted' ? 'Assisted' : 'Active'} · {cfg.name} · camera tracking {Math.round(live.conf * 100)}%
             </div>
@@ -553,6 +622,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         </div>
       </Card>
 
+      <p className="tiny muted">A 2D camera estimate, not a clinical goniometer. Keep the camera still at the side of your leg.</p>
       <div className="row">
         <button className="btn" onClick={toggleMute} aria-pressed={muted}>
           {muted ? 'Unmute' : 'Mute voice'}

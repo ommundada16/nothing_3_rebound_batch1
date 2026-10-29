@@ -47,3 +47,8 @@ export function heelSlideTasks(plan) {
     {...exercise, key:'heel-slide-assisted', mode:'assisted', name:'Heel slide — assisted', description:'With help'},
   ];
 }
+
+export function exerciseTaskDone(session, task) {
+ const completed = session.completedReps ?? session.reps?.filter(r=>r.complete).length ?? 0;
+ return session.exercise === task.id && session.mode === task.mode && completed >= task.reps;
+}

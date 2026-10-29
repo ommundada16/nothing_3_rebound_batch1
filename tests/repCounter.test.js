@@ -70,3 +70,25 @@ test('null samples (camera cannot see the leg) are ignored', () => {
   c.update(null, 0);
   assert.equal(c.state, 'rest');
 });
+
+
+test('a lost camera interval cannot count as observed holding time',()=>{
+ const c=new RepCounter({base:12,minPeak:30,holdMs:3000});
+ for(let t=0;t<=1800;t+=100)c.update(t<300?2:80,t);
+ assert.equal(c.state,'holding');c.update(null,1900);c.update(80,10000);
+ assert.equal(c.completed,0);assert.equal(c.state,'recovering');
+ c.update(2,10100);assert.equal(c.state,'rest');
+});
+test('a frame gap without null samples also invalidates the current hold',()=>{
+ const c=new RepCounter({base:12,minPeak:30,holdMs:3000});
+ for(let t=0;t<=1800;t+=100)c.update(t<300?2:80,t);
+ c.update(80,10000);assert.equal(c.state,'recovering');assert.equal(c.completed,0);
+});
+test('a repetition that exceeded the bend limit is not counted as complete',()=>{
+ const c=new RepCounter({base:12,minPeak:30,holdMs:3000});
+ run(c,[{from:2,to:2,ms:1200},{from:2,to:92,ms:2200},{from:92,to:92,ms:1000}]);
+ c.invalidateLimit();
+ // Continue time monotonically after the first part.
+ for(let t=4500;t<9000;t+=33)c.update(t<7000?92:2,t);
+ assert.equal(c.completed,0);
+});

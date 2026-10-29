@@ -41,6 +41,7 @@ export class CuePlayer {
     const label = CUE_TAGS.find((t) => t.id === tag)?.label || tag;
     const clip = this.pick(tag);
     this.stop();
+    if(typeof speechSynthesis !== 'undefined')speechSynthesis.cancel();
     if (clip) {
       const a = new Audio(mediaUrl(clip.mediaId));
       this.audio = a;
@@ -51,7 +52,7 @@ export class CuePlayer {
       a.onended = () => {
         this.busyUntil = 0;
       };
-      a.play().catch(() => {});
+      a.play().catch(() => { this.busyUntil=0; });
       this.onCaption({ tag, text: clip.text || label, source: 'physio' });
       return true;
     }
@@ -67,6 +68,7 @@ export class CuePlayer {
 
   // System (non-physio) voice, e.g. "move the phone back".
   speak(text) {
+    this.stop();
     if (this.muted || typeof speechSynthesis === 'undefined') return;
     try {
       speechSynthesis.cancel();

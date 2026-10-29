@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { EXERCISES, heelSlideTasks } from '../../shared/exercises.js';
+import { EXERCISES, heelSlideTasks, exerciseTaskDone } from '../../shared/exercises.js';
 import { expectedFlexion } from '../../shared/objective.js';
 import { dayPostOp, dayIndex } from '../../shared/time.js';
 import { api } from '../lib/api.js';
@@ -122,7 +122,7 @@ function Today({ state, now, store, setSession, setTab, dueFollowUps, toast }) {
   const hour = new Date(now()).getHours();
   const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const tasks = heelSlideTasks(state.plan);
-  const doneCount = tasks.filter(pe => todays.some(s => s.exercise === pe.id && s.mode === pe.mode)).length;
+  const doneCount = tasks.filter(pe => todays.some(s => exerciseTaskDone(s, pe))).length;
 
   const callPhysio = async () => {
     if (!window.confirm('Ask your physio to call you? They will be alerted straight away.')) return;
@@ -151,7 +151,7 @@ function Today({ state, now, store, setSession, setTab, dueFollowUps, toast }) {
         </div>
         {tasks.map((pe) => {
           const cfg = EXERCISES[pe.id];
-          const done = todays.some((s) => s.exercise === pe.id && s.mode === pe.mode);
+          const done = todays.some((s) => exerciseTaskDone(s, pe));
           return (
             <button key={pe.key} className="row-link exercise-card" onClick={() => setSession(pe)}>
               <span className={`dot ${done ? 'done' : ''}`}>{done ? '✓' : ''}</span>

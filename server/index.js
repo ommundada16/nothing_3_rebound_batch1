@@ -1,5 +1,6 @@
 import express from 'express';
 import { installAccounts } from './accounts.js';
+import { movementPlanError } from '../shared/movementPlan.js';
 import { emptyCare, validateCare } from '../shared/care.js';
 import { randomUUID } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -95,7 +96,7 @@ app.get('/api/state', (req, res) => {
     patient:{name:state.patient.name,surgeryTs:state.patient.surgeryTs},
     family:state.family,care:state.care,plan:{exercises:state.plan.exercises.map(e=>({id:e.id}))},
     issues:state.issues.map(i=>({id:i.id,status:i.status,tier:i.tier})),
-    sessions:state.sessions.map(s=>({id:s.id,exercise:s.exercise,mode:s.mode,ts:s.ts}))
+    sessions:state.sessions.map(s=>({id:s.id,exercise:s.exercise,mode:s.mode,completedReps:s.reps?.filter(r=>r.complete).length || 0,ts:s.ts}))
   } : state;
   res.json({ rev: state.rev, state: { ...visible, serverNow: nowOf(state), scenarios: SCENARIOS, ai: Boolean(process.env.GROQ_API_KEY) } });
 });
@@ -115,6 +116,7 @@ const EDITABLE = new Set(['plan', 'playbook', 'cues', 'cueLanguage', 'refVideos'
 app.put('/api/state/:key', (req, res) => {
   const { key } = req.params;
   if (!EDITABLE.has(key)) return res.status(400).json({ error: 'Not editable' });
+  if(key === 'plan') {const error=movementPlanError(req.body.value); if(error)return res.status(400).json({error});}
   if (key === 'care') {
     const next = req.body.value;
     if (!validateCare(next)) return res.status(400).json({error:'Check the care plan fields and times.'});

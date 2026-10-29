@@ -7,9 +7,9 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const wasmSrc = resolve(root, 'node_modules/@mediapipe/tasks-vision/wasm');
 const wasmDst = resolve(root, 'public/wasm');
-const modelDst = resolve(root, 'public/models/pose_landmarker_lite.task');
+const modelDst = resolve(root, 'public/models/pose_landmarker_full.task');
 const MODEL_URL =
-  'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+  'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task';
 
 mkdirSync(wasmDst, { recursive: true });
 mkdirSync(dirname(modelDst), { recursive: true });

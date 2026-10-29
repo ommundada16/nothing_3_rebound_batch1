@@ -24,6 +24,7 @@ export class RepCounter {
     this.lastTick = 0;
     this.value = null;
     this.velocity = 0;
+    this.lastValidT = null;
   }
 
   get completed() {
@@ -42,9 +43,28 @@ export class RepCounter {
     return dt > 0.05 ? (v - ref.v) / dt : 0;
   }
 
+  loseTracking() {
+    this.hist = []; this.stableSince = null; this.lastValidT = null;
+    if (this.state !== 'rest' && this.state !== 'recovering') {
+      this.state='recovering'; this.rep=null; this.holdStart=0;
+      this.emit('tracking_lost');
+    }
+  }
+
+  invalidateLimit() {
+    if(this.rep) { this.rep.limitExceeded=true; this.rep.complete=false; }
+  }
+
   // v: smoothed signal in degrees, or null when the camera cannot see the leg.
   update(v, t) {
-    if (v == null) return;
+    if (!Number.isFinite(v)) { this.loseTracking(); return; }
+    if(this.lastValidT != null && t-this.lastValidT > 350) this.loseTracking();
+    this.lastValidT=t;
+    if(this.state === 'recovering') {
+      this.value=v;
+      if(v < this.base+6) { this.state='rest'; this.hist=[]; }
+      return;
+    }
     this.value = v;
     const vel = this.velocityAt(v, t);
     this.velocity = vel;
@@ -91,7 +111,7 @@ export class RepCounter {
         }
         if (elapsed >= this.holdMs) {
           this.state = 'released';
-          this.rep.complete = true;
+          this.rep.complete = !this.rep.limitExceeded;
           this.rep.holdMs = elapsed;
           this.emit('release', { peak: this.holdPeak });
         } else if (v < this.holdPeak - 8) {
@@ -105,7 +125,7 @@ export class RepCounter {
 
       case 'released':
         if (v < this.base + 6) {
-          const rep = { peak: Math.round(this.holdPeak * 10) / 10, holdMs: Math.round(this.rep.holdMs), complete: !!this.rep.complete };
+          const rep = { peak: Math.round(this.holdPeak * 10) / 10, holdMs: Math.round(this.rep.holdMs), complete: !!this.rep.complete, limitExceeded: !!this.rep.limitExceeded };
           this.reps.push(rep);
           this.state = 'rest';
           this.rep = null;

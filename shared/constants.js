@@ -13,6 +13,8 @@ export const CUE_TAGS = [
   { id: 'again', label: 'Keep going (stalled / early release)', hint: 'e.g. "Come on, one more push"' },
   { id: 'slow', label: 'Slow down', hint: 'e.g. "Slowly, control it"' },
   { id: 'stop', label: 'Stop if sharp pain', hint: 'e.g. "Stop if it is a sharp pain"' },
+  { id: 'near_limit', label: 'Approaching the prescribed bend limit', hint: 'Do not bend further. Follow the limit set by your doctor.' },
+  { id: 'angle_limit', label: 'Bend limit reached — stop', hint: 'Stop bending. Do not go past your prescribed limit. Gently release.' },
   { id: 'done', label: 'Session done', hint: 'e.g. "Well done, that is today finished"' },
 ];
 
@@ -26,6 +28,8 @@ export const CUE_FALLBACK = {
   again: 'Come on, keep going.',
   slow: 'Slowly, control it.',
   stop: 'Stop if you feel a sharp pain.',
+  near_limit: 'You are near your prescribed bend limit. Do not bend further.',
+  angle_limit: 'Stop bending. Do not go past your prescribed limit. Gently release.',
   done: 'Well done. That is today finished.',
 };
 

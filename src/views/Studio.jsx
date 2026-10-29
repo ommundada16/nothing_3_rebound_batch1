@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { CUE_TAGS, SYMPTOMS } from '../../shared/constants.js';
 import { EXERCISES } from '../../shared/exercises.js';
+import { movementPlanError } from '../../shared/movementPlan.js';
 import { DEFAULT_PLAYBOOK } from '../../shared/playbook.js';
 import { api, mediaUrl } from '../lib/api.js';
 import { Card, Icon } from '../components/ui.jsx';
@@ -290,6 +291,8 @@ export function PlanStudio({ state, refresh, toast, suggestions }) {
 
   const save = async () => {
     const next = { ...plan, precautions: prec.split('\n').map((s) => s.trim()).filter(Boolean), updatedBy: 'Physio' };
+    const error=movementPlanError(next);
+    if(error){toast(error);return;}
     await api.setKey('plan', next, 'physio');
     await refresh();
     toast('Plan saved. The patient sees it straight away.');
@@ -332,6 +335,14 @@ export function PlanStudio({ state, refresh, toast, suggestions }) {
                 <label className="field">Hold (seconds)</label>
                 <input type="number" min="1" max="30" value={e.holdSec} onChange={(ev) => setEx(e.id, { holdSec: +ev.target.value })} />
               </div>
+              <label className="field">Doctor’s maximum bend (degrees)
+                <input type="number" min="30" max="150" placeholder="Only if prescribed, e.g. 90" value={e.maxFlexion ?? ''} onChange={ev=>setEx(e.id,{maxFlexion:ev.target.value === '' ? null : Number(ev.target.value)})}/>
+                <span className="tiny">Warnings start 5° before this estimate. Leave blank if no limit is prescribed.</span>
+              </label>
+              <label className="field">Physio’s repetition target (degrees)
+                <input type="number" min="20" max="150" placeholder="Optional" value={e.targetFlexion ?? ''} onChange={ev=>setEx(e.id,{targetFlexion:ev.target.value === '' ? null : Number(ev.target.value)})}/>
+                <span className="tiny">Count a held repetition at this bend, followed by a return to the starting position.</span>
+              </label>
               {e.id === 'slr' && (
                 <div>
                   <label className="field">Pillow stage</label>

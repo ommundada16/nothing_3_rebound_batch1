@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import DailyCare, { CareReminders } from './DailyCare.jsx';
-import { EXERCISES, heelSlideTasks } from '../../shared/exercises.js';
+import { EXERCISES, heelSlideTasks, exerciseTaskDone } from '../../shared/exercises.js';
 import { dayPostOp } from '../../shared/time.js';
 import { api } from '../lib/api.js';
 import { relTime, sessionsToday } from '../lib/data.js';
@@ -19,7 +19,7 @@ export default function Family({ store }) {
   const todays = sessionsToday(state.sessions, now());
   const last = [...state.sessions].sort((a, b) => b.ts - a.ts)[0];
   const tasks = heelSlideTasks(state.plan);
-  const doneToday = tasks.length > 0 && tasks.every(pe => todays.some(s => s.exercise === pe.id && s.mode === pe.mode));
+  const doneToday = tasks.length > 0 && tasks.every(pe => todays.some(s => exerciseTaskDone(s, pe)));
   const someToday = todays.length > 0;
 
   let status;
@@ -62,7 +62,7 @@ export default function Family({ store }) {
           <Card title="Today's exercises" tight>
             <ul className="list-clean">
               {tasks.map((pe) => {
-                const done = todays.some((s) => s.exercise === pe.id && s.mode === pe.mode);
+                const done = todays.some((s) => exerciseTaskDone(s, pe));
                 return (
                   <li key={pe.key} className="row between">
                     <span>{pe.name}</span>
