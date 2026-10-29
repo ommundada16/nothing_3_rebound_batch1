@@ -1,3 +1,11 @@
+## Detection recovery and camera help — 29 October 2026
+
+- Fixed initial acquisition starvation when visibility winners alternate: initial side is selected from accumulated scores over 400 ms, rather than requiring an uninterrupted winner.
+- Fixed stale spatial anchor lockout after camera/leg repositioning: LockedLegTracker can re-anchor the same side after 900 ms of stable coherent observations, rejecting overlapping legs and single-frame jumps. Reacquisition resets smoothing and invalidates any partial rep; no missing time is counted. It does not switch to the other anatomical side automatically.
+- Added cameraGuidance.js for no pose, cropped joints, hidden joints, reconnecting and side-view instructions. Live positioning help and an expandable checklist appear when tracking pauses; setup guidance also appears before starting. A Check camera position again button reacquires without clearing saved full reps; detecting a different knee ends the run without mixed-knee saving. Speech remains once per loss episode.
+- Camera-frame stalls show a separate connection/tab message. These suggestions reflect landmark/framing evidence, not a diagnosis of sitting posture.
+- Verified 61 unit tests and production build; real laptop camera detection and clinical angle accuracy still require user testing.
+
 ## Follow-up fixes — 29 October 2026
 
 - Each heel-slide mode has a separate prescription card and optional modeSettings overrides (reps, hold, maximum). shared/exercises.js exercisePrescription resolves inherited defaults; patient tasks, sessions, family completion and server live-alert checks use the appropriate mode. Existing plans need no migration.

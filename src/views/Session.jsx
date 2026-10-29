@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { CuePlayer } from '../lib/cues.js';
 import { Smoother, LockedLegTracker, LegMedianFilter, flexionFrom, liftFrom, readLeg } from '../lib/geometry.js';
 import { detect, loadPose, openCamera } from '../lib/pose.js';
+import { cameraGuidance } from '../lib/cameraGuidance.js';
 import { TrackingQuality } from '../lib/trackingQuality.js';
 import { AngleGuard } from '../lib/angleGuard.js';
 import { RepCounter } from '../lib/repCounter.js';
@@ -141,7 +142,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     setErr('');
     const r = run.current;
     r.shots = []; r.runId=crypto.randomUUID(); r.alertSent=false;
-    r.timers=[]; r.finishing=false; r.lastVT=null; r.selectedSide=null; r.sideChanged=false; r.lastDisplayed=null;
+    r.timers=[]; r.finishing=false; r.lastVT=null; r.selectedSide=null; r.sideChanged=false; r.restartingSide=null; r.lastDisplayed=null;
     r.jointFilter=new LegMedianFilter(); r.selector=new LockedLegTracker(); r.quality=new TrackingQuality();r.trackingNotice=false;r.recoveredSince=null;
     r.guard=new AngleGuard({maxFlexion,margin:Number(planEx.warningMarginDeg)||5});
     r.guardStatus={state:'unknown',blocked:true};
@@ -315,7 +316,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
       } else {
         if(now-(r.lastValidFrame ?? r.startedPerf)>1200) {
           r.counter.update(null,now);r.guardStatus=r.guard.update(null,now);
-          if(now-r.lastUi>250){r.lastUi=now;setLive(v=>({...v,value:null,conf:0,low:true,tick:0,phase:r.counter.state,guard:'unknown'}));}
+          if(now-r.lastUi>250){r.lastUi=now;setLive(v=>({...v,value:null,conf:0,low:true,paused:true,guidance:{title:'Waiting for camera frames',tip:'Keep this browser tab open and check that the webcam is connected. If the picture is frozen, stop and restart the camera.'},tick:0,phase:r.counter.state,guard:'unknown'}));}
         }
         schedule();
         return;
@@ -332,7 +333,10 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
 
     const selection = r.selector.update(landmarks, LEG, w, h, now);
     const useSide = selection.side;
+    if(r.restartingSide&&useSide&&useSide!==r.restartingSide){setErr('The other knee was detected after repositioning. Start a new session to keep the two knees separate.');r.sideChanged=true;finish();return;}
+    if(useSide)r.restartingSide=null;
     const observedLeg = selection.leg;
+    if(selection.reacquired){r.jointFilter.reset();r.smoother.reset();r.quality=new TrackingQuality();r.counter.loseTracking();}
     const leg = observedLeg?.confidence>=.35 ? r.jointFilter.push(observedLeg) : observedLeg;
     if(!observedLeg || observedLeg.confidence<.35)r.jointFilter.reset();
     const conf = leg ? leg.confidence : 0;
@@ -342,6 +346,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     const quality=r.quality.assess(leg,w,h,raw);
     if(!leg&&selection.reason)quality.reason=selection.reason;
     const ok=quality.accepted;
+    const guidance=ok?null:cameraGuidance(landmarks,useSide,quality.reason);
 
     let value = null;
     if (ok) {
@@ -377,7 +382,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     }
     const low = !ok && r.lowSince != null && now - r.lowSince > 2200;
     if(low && !r.trackingNotice && now-r.lowSince>5000){
-      const spoken=r.cues.speak('Please adjust the camera so the whole leg is in view.',{key:'tracking-help'});
+      const spoken=r.cues.speak(guidance?.tip||'Please include your hip, knee and foot in the camera view.',{key:'tracking-help'});
       if(spoken)r.trackingNotice=true;
     }
 
@@ -400,7 +405,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         done: r.counter.completed,
         tick: r.counter.state === 'holding' ? Math.min(planEx.holdSec, ((r.counter.gapStart ?? now) - r.counter.holdStart) / 1000) : 0,
         conf,
-        low, guard:r.guardStatus.state, reason:quality.reason, quality:quality.quality, side:useSide,
+        low, guidance, guard:r.guardStatus.state, reason:quality.reason, quality:quality.quality, side:useSide,
       });
     }
     schedule();
@@ -484,7 +489,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         <RefVideos refVideos={state.refVideos} exerciseId={exerciseId} mode={mode} />
         <p className="exercise-prescription"><b>{planEx.reps} repetitions</b> · Hold for <b>{planEx.holdSec} seconds</b></p>
         <p>Move gently. Stop if you feel sharp pain.</p>
-        {source === 'camera' && <p className="small muted">The knee is selected automatically. Place the camera squarely beside your leg at knee height. Keep your torso, hip, knee and ankle visible.</p>}
+        {source === 'camera' && <Card title="Before you start the camera"><ol><li>Use the supported position shown in your physio’s video.</li><li>Place the laptop at knee height, squarely beside your exercising leg, about 1.5–2 metres away.</li><li>Check that your torso, hip, knee and foot all fit in the picture.</li><li>Keep the exercising leg nearest the camera, with good light from in front.</li></ol><p className="small muted">The knee is selected automatically. Hold still briefly in your starting position so tracking can settle.</p></Card>}
         {maxFlexion && <p className="callout review">Prescribed maximum: <b>{maxFlexion}°</b>. The app warns before this estimated angle. Follow your doctor’s restriction.</p>}
         {err && <div className="callout urgent" role="alert">{err}</div>}
         <button className="btn primary big" onClick={start} disabled={loadingModel}>{loadingModel ? 'Getting ready…' : 'Start exercise'}</button>
@@ -598,6 +603,12 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         )}
         {live.low && <div className="lowconf" role="status">{live.reason || 'Adjust the camera to see your whole leg.'}</div>}
       </div>
+
+      {source==='camera' && live.paused && <Card title={live.guidance?.title||'Waiting for the camera'}>
+        <p role="status">{live.guidance?.tip||'Keep your torso, hip, knee and foot visible. Hold still briefly in the starting position.'}</p>
+        <details className="more"><summary>Camera and position checklist</summary><ol><li>Use the supported position shown in your physio’s reference video.</li><li>Put the camera at knee height, squarely beside your exercising leg, about 1.5–2 metres away.</li><li>Include your torso, hip, knee and foot with some space around them.</li><li>Keep the exercising leg closest to the camera. Avoid the other leg or furniture blocking it.</li><li>Use good light from in front of you and keep the camera steady.</li></ol></details>
+        <button className="btn" onClick={()=>{const r=run.current;r.selector=new LockedLegTracker();r.jointFilter.reset();r.smoother.reset();r.quality=new TrackingQuality();r.counter.loseTracking();r.restartingSide=r.selectedSide;}}>Check camera position again</button>
+      </Card>}
 
       <Card tight>
         <div className="row between">

@@ -65,12 +65,18 @@ export function bestSide(landmarks, LEG) {
 // Require a sustained visibility advantage before changing anatomical sides.
 // Never splice the hip of one leg onto the knee/ankle of the other.
 export class AutoLegSelector {
- constructor(){this.side=null;this.candidate=null;this.since=0;}
+ constructor(){this.side=null;this.candidate=null;this.since=0;this.initialSince=null;this.scores={left:0,right:0};}
  update(landmarks,indices,now){
   const score=side=>Math.min(...Object.values(indices[side]).slice(0,3).map(i=>landmarks?.[i]?.visibility??0));
   const left=score('left'),right=score('right');
   const winner=left>=right?'left':'right';
   const best=Math.max(left,right),current=this.side==='left'?left:right;
+  if(!this.side){
+   if(best<.35){this.initialSince=null;this.scores={left:0,right:0};return {side:null,changed:false};}
+   this.initialSince ??= now;this.scores.left+=left;this.scores.right+=right;
+   if(now-this.initialSince>=400)this.side=this.scores.left>=this.scores.right?'left':'right';
+   return {side:this.side,changed:false};
+  }
   let changed=false;
   if(best<.35){this.candidate=null;return {side:this.side,changed};}
   const eligible=!this.side || winner!==this.side && best-current>.18;
@@ -100,7 +106,7 @@ export class LegMedianFilter {
 // Acquire an anatomical label once. Visibility changes must never select the
 // stationary leg behind it. Spatial continuity also catches label flips in Pose.
 export class LockedLegTracker {
- constructor(){this.acquire=new AutoLegSelector();this.side=null;this.last=null;this.lastAt=0;}
+ constructor(){this.acquire=new AutoLegSelector();this.side=null;this.last=null;this.lastAt=0;this.pending=null;this.pendingSince=null;}
  update(landmarks,indices,width,height,now){
   if(!this.side)this.side=this.acquire.update(landmarks,indices,now).side;
   if(!this.side)return {side:null,leg:null,reason:'Finding your leg…'};
@@ -110,9 +116,24 @@ export class LockedLegTracker {
    const size=Math.max(20,Math.hypot(this.last.hip.x-this.last.knee.x,this.last.hip.y-this.last.knee.y),Math.hypot(this.last.ankle.x-this.last.knee.x,this.last.ankle.y-this.last.knee.y));
    const distance=Math.max(...['hip','knee','ankle'].map(k=>Math.hypot(leg[k].x-this.last[k].x,leg[k].y-this.last[k].y)))/size;
    const allowance=.22+Math.min(.18,Math.max(0,now-this.lastAt)/1000*.5);
-   if(distance>allowance)return {side:this.side,leg:null,reason:'Leg position is uncertain. Keep the same leg visible or restart.'};
+   if(distance>allowance){
+    // A moved camera used to leave the old anchor in place forever. Recover
+    // only from sustained, coherent observations of the SAME anatomical side.
+    const keys=['hip','knee','ankle'];
+    const stable=this.pending&&keys.every(k=>Math.hypot(leg[k].x-this.pending[k].x,leg[k].y-this.pending[k].y)<size*.1);
+    if(!stable)this.pendingSince=now;
+    this.pending=leg;
+    const thigh=Math.hypot(leg.hip.x-leg.knee.x,leg.hip.y-leg.knee.y),shin=Math.hypot(leg.ankle.x-leg.knee.x,leg.ankle.y-leg.knee.y);
+    const other=readLeg(landmarks,indices[this.side==='left'?'right':'left'],width,height);
+    const overlap=other&&keys.every(k=>Math.hypot(leg[k].x-other[k].x,leg[k].y-other[k].y)<size*.12);
+    if(stable && now-this.pendingSince>=900 && thigh>20 && shin>20 && thigh/shin>.4 && thigh/shin<2.5 && !overlap){
+     this.last=leg;this.lastAt=now;this.pending=null;this.pendingSince=null;
+     return {side:this.side,leg,reason:'',reacquired:true};
+    }
+    return {side:this.side,leg:null,reason:'Hold your starting position briefly while the camera finds the same leg again.'};
+   }
   }
-  this.last=leg;this.lastAt=now;
+  this.last=leg;this.lastAt=now;this.pending=null;this.pendingSince=null;
   return {side:this.side,leg,reason:''};
  }
 }
