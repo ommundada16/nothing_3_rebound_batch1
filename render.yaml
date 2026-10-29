@@ -1,0 +1,28 @@
+# This creates a PAID service and persistent disk only when you approve it in Render.
+services:
+  - type: web
+    name: rebound-api
+    runtime: node
+    region: singapore
+    plan: 0.5c-512mb
+    numInstances: 1
+    buildCommand: npm ci --omit=dev --ignore-scripts
+    startCommand: npm run server
+    healthCheckPath: /api/health
+    disk:
+      name: rebound-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: PHYSIO_DATA_DIR
+        value: /var/data/rebound
+      - key: REBOUND_DEMO_ACCOUNTS
+        value: "1"
+      - key: PHYSIO_SKIP_IMPORT
+        value: "1"

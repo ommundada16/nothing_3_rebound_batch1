@@ -1,0 +1,8 @@
+server/
+tmp/
+tests/
+docs/
+node_modules/
+.git/
+.env
+.env.*

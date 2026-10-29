@@ -1,3 +1,7 @@
+## Hosting on Vercel
+
+Use Vercel for the Vite website and a single persistent Render Node service for the API. Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The actual Render URL must be configured in `vercel.json` before the Vercel build succeeds. No hosted service has been created yet. The Render blueprint requires a paid persistent-disk plan.
+
 ## Try the named demo workspace
 
 There are 14 fictional Indian-name demo accounts around Pune and Mumbai. Their credentials are kept in the demo guide, not on the login page. Full list and role duties: [docs/DEMO_ACCOUNTS.md](docs/DEMO_ACCOUNTS.md). Demo records are separate from existing records.

@@ -6,7 +6,7 @@ export function installAccounts(app, file, onLogin = () => {}) {
  const publicUser = u => ({id:u.id, name:u.name, email:u.email, role:u.role,city:u.city||'',postalCode:u.postalCode||'',isDemo:Boolean(u.isDemo)});
  const addUser=({name,email,password,role,city='',postalCode='',isDemo=false})=>{if(users.some(u=>u.email===email.toLowerCase()))throw new Error('That email is already registered.');const salt=randomBytes(16).toString('hex');const user={id:randomUUID(),name:name.trim(),email:email.toLowerCase(),role,isDemo,city:String(city||'').trim().slice(0,100),postalCode:String(postalCode||'').trim().slice(0,20),salt,hash:scryptSync(password,salt,64).toString('hex')};users.push(user);save();return user;};
  const save = () => writeFileSync(file, JSON.stringify(users));
- const cookie = (req, res, token) => res.setHeader('Set-Cookie', `pt_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${token ? 86400 : 0}${req.secure ? '; Secure' : ''}`);
+ const cookie = (req, res, token) => res.setHeader('Set-Cookie', `pt_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${token ? 86400 : 0}${req.secure || process.env.NODE_ENV==='production' ? '; Secure' : ''}`);
  app.use('/api', (req,res,next) => {
   const token = req.headers.cookie?.split(';').map(v=>v.trim()).find(v=>v.startsWith('pt_session='))?.slice(11);
   const session = sessions.get(token);

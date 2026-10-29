@@ -70,6 +70,8 @@ function commit() {
 }
 
 const app = express();
+if(process.env.TRUST_PROXY==='1')app.set('trust proxy',1);
+app.use('/api',(_req,res,next)=>{res.setHeader('Cache-Control','private, no-store');res.setHeader('CDN-Cache-Control','no-store');next();});
 app.use(express.json({ limit: '8mb' }));
 let registry;
 const accounts = installAccounts(app, resolve(DATA_DIR, 'accounts.json'), user => registry?.recordLogin(user));

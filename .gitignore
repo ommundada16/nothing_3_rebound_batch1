@@ -11,3 +11,7 @@ public/models/
 tmp/
 
 public/ocr/
+
+.vercel/
+.env.*
+!.env.example

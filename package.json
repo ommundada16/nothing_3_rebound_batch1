@@ -13,7 +13,9 @@
     "setup": "node scripts/setup-assets.mjs",
     "postinstall": "node scripts/setup-assets.mjs",
     "test": "node --test tests/*.test.js",
-    "dev:phone": "concurrently -k -n api,web -c blue,green \"node server/index.js\" \"vite --host --mode phone\""
+    "dev:phone": "concurrently -k -n api,web -c blue,green \"node server/index.js\" \"vite --host --mode phone\"",
+    "configure:vercel": "node scripts/configure-vercel.mjs",
+    "build:vercel": "node scripts/check-deployment.mjs && node scripts/setup-assets.mjs && node scripts/check-camera-assets.mjs && vite build"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "0.10.21",
@@ -26,5 +28,8 @@
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
     "vite": "^5.4.11"
+  },
+  "engines": {
+    "node": ">=22 <25"
   }
 }

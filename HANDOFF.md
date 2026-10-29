@@ -1,3 +1,11 @@
+## Hosting preparation — 29 October 2026
+
+- User selected Vercel frontend plus a persistent backend. Added render.yaml for one paid Node service with a disk mounted at /var/data and PHYSIO_DATA_DIR=/var/data/rebound. No resources or deployments have been created; no cloud credentials are available. Render disk billing must be accepted by the user in Render.
+- vercel.json selects Vite and build:vercel. It contains an explicit backend-origin placeholder; the deployment guard refuses to build until configure:vercel is run with the real Render URL and that change is committed. Local build/dev continue to work. External rewrites keep /api same-origin; private/no-store headers disable proxy/CDN API caching.
+- Production cookies are Secure; TRUST_PROXY=1 supports Render’s HTTPS proxy. Local cookie behaviour is preserved.
+- Bundled ONLY the two supplied healthy-reference demonstrations under public/reference (roughly 17 MB total) and added fallback playback for fresh cloud records. Private patient data/media remain excluded. Build:vercel verifies MediaPipe WASM/model plus reference assets before Vite builds.
+- Documentation: docs/DEPLOYMENT.md gives backend-first/dashboard steps, paid-disk requirement, actual URL wiring, hosted acceptance checks and limitations. The site is not yet publicly deployed. Existing local records are not uploaded automatically.
+
 ## Login cleanup — 29 October 2026
 
 Removed the demo-account directory, password display, credential autofill and demo-list fetch from Account.jsx at the user’s request. Demo accounts remain available; sign-in credentials are in docs/DEMO_ACCOUNTS.md.
