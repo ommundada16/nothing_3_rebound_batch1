@@ -24,7 +24,7 @@ export class RepCounter {
     this.lastTick = 0;
     this.value = null;
     this.velocity = 0;
-    this.lastValidT = null; this.gapStart=null;
+    this.lastValidT = null; this.gapStart=null; this.armed=false; this.releaseSince=null; this.holdAnchor=null;
   }
 
   get completed() {
@@ -75,12 +75,13 @@ export class RepCounter {
       return;
     }
     this.value = v;
+    if(v<this.base+6)this.armed=true;
     const vel = this.velocityAt(v, t);
     this.velocity = vel;
 
     switch (this.state) {
       case 'rest':
-        if (v > this.base + 6 && vel > 4) {
+        if (this.armed && v > this.base + 6 && vel > .5) {
           this.state = 'moving';
           this.rep = { startT: t, max: v };
           this.stableSince = null;
@@ -95,7 +96,7 @@ export class RepCounter {
 
         if (v >= this.minPeak && this.stableSince != null && t - this.stableSince >= 350) {
           this.state = 'holding';
-          this.holdStart = t;
+          this.holdStart = t; this.holdAnchor=v; this.releaseSince=null;
           this.holdPeak = v;
           this.lastTick = 0;
           this.emit('peak', { value: v });
@@ -111,6 +112,9 @@ export class RepCounter {
       }
 
       case 'holding': {
+        if(v>this.holdAnchor+6){this.state='moving';this.stableSince=null;this.rep.max=Math.max(this.rep.max,v);break;}
+        const falling=v<this.holdPeak-8 && vel < -5;
+        this.releaseSince=falling?(this.releaseSince??t):null;
         this.holdPeak = Math.max(this.holdPeak, v);
         const elapsed = t - this.holdStart;
         const sec = Math.floor(elapsed / 1000);
@@ -123,7 +127,7 @@ export class RepCounter {
           this.rep.complete = !this.rep.limitExceeded;
           this.rep.holdMs = elapsed;
           this.emit('release', { peak: this.holdPeak });
-        } else if (v < this.holdPeak - 8) {
+        } else if (this.releaseSince!=null && t-this.releaseSince>=200) {
           this.state = 'released';
           this.rep.complete = false;
           this.rep.holdMs = elapsed;

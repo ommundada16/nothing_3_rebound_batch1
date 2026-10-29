@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { EXERCISES, LEG } from '../../shared/exercises.js';
+import { EXERCISES, LEG, exercisePrescription } from '../../shared/exercises.js';
 import { api } from '../lib/api.js';
 import { CuePlayer } from '../lib/cues.js';
-import { Smoother, AutoLegSelector, LegMedianFilter, flexionFrom, liftFrom, readLeg } from '../lib/geometry.js';
+import { Smoother, LockedLegTracker, LegMedianFilter, flexionFrom, liftFrom, readLeg } from '../lib/geometry.js';
 import { detect, loadPose, openCamera } from '../lib/pose.js';
 import { TrackingQuality } from '../lib/trackingQuality.js';
 import { AngleGuard } from '../lib/angleGuard.js';
@@ -34,7 +34,7 @@ function simProfile(state, exerciseId, mode) {
 
 export default function Session({ state, exerciseId, initialMode = 'active', onExit, toast }) {
   const cfg = EXERCISES[exerciseId];
-  const planEx = state.plan.exercises.find((e) => e.id === exerciseId) || { reps: 8, holdSec: 3 };
+  const planEx = exercisePrescription(state.plan,exerciseId,initialMode);
   const stage = planEx.stage || null;
   const maxFlexion = Number(planEx.maxFlexion) > 0 ? Number(planEx.maxFlexion) : null;
 
@@ -142,7 +142,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     const r = run.current;
     r.shots = []; r.runId=crypto.randomUUID(); r.alertSent=false;
     r.timers=[]; r.finishing=false; r.lastVT=null; r.selectedSide=null; r.sideChanged=false; r.lastDisplayed=null;
-    r.jointFilter=new LegMedianFilter(); r.selector=new AutoLegSelector(); r.quality=new TrackingQuality();r.trackingNotice=false;r.recoveredSince=null;
+    r.jointFilter=new LegMedianFilter(); r.selector=new LockedLegTracker(); r.quality=new TrackingQuality();r.trackingNotice=false;r.recoveredSince=null;
     r.guard=new AngleGuard({maxFlexion,margin:Number(planEx.warningMarginDeg)||5});
     r.guardStatus={state:'unknown',blocked:true};
     r.limitEvents=[]; r.observedPeak=null;
@@ -330,10 +330,9 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
       }
     }
 
-    const selection = r.selector.update(landmarks, LEG, now);
+    const selection = r.selector.update(landmarks, LEG, w, h, now);
     const useSide = selection.side;
-    if(selection.changed){r.smoother.reset();r.quality=new TrackingQuality();r.counter.update(null,now+1000);r.selectedSide=useSide;r.sideChanged=true;setErr("The tracked leg changed. Restart with the same leg clearly visible.");finish();return;}
-    const observedLeg = useSide ? readLeg(landmarks, LEG[useSide], w, h) : null;
+    const observedLeg = selection.leg;
     const leg = observedLeg?.confidence>=.35 ? r.jointFilter.push(observedLeg) : observedLeg;
     if(!observedLeg || observedLeg.confidence<.35)r.jointFilter.reset();
     const conf = leg ? leg.confidence : 0;
@@ -341,6 +340,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     r.confN += 1;
     const raw = leg ? (cfg.signal === 'flexion' ? flexionFrom(leg.hip,leg.knee,leg.ankle) : liftFrom(leg.hip,leg.knee)) : null;
     const quality=r.quality.assess(leg,w,h,raw);
+    if(!leg&&selection.reason)quality.reason=selection.reason;
     const ok=quality.accepted;
 
     let value = null;
@@ -442,6 +442,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         exercise: exerciseId,
         mode,
         leg: run.current.selectedSide || side,
+        legSource: 'automatic-camera-estimate',
         stage,
         reps: summary.reps,
         metrics: { peak: summary.peak, deficit: summary.deficit },
@@ -542,7 +543,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         )}
 
         {summary.peak == null && <div className="callout review">No consistent measurement was recorded. Keep the same leg in view with the hip, knee and ankle visible, then try again.<button className="btn" onClick={()=>setStep('setup')}>Try again</button></div>}
-        <Card title="How was it?">
+        <p className="small muted">{summary.reps.filter(r=>r.limitExceeded).length>0?`${summary.reps.filter(r=>r.limitExceeded).length} repetitions crossed the prescribed maximum and were excluded.`:'A full repetition includes the prescribed hold and a return to the starting position.'}</p><Card title="How was it?">
           <label className="field">Pain during the exercise: {self.pain} / 10</label>
           <input type="range" min="0" max="10" value={self.pain} onChange={(e) => setSelf({ ...self, pain: +e.target.value })} />
           <label className="field" style={{ marginTop: 12 }}>

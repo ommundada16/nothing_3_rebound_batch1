@@ -1,5 +1,6 @@
 import express from 'express';
 import { installAccounts } from './accounts.js';
+import { exercisePrescription, heelSlideTasks } from '../shared/exercises.js';
 import { movementPlanError } from '../shared/movementPlan.js';
 import { emptyCare, validateCare } from '../shared/care.js';
 import { randomUUID } from 'node:crypto';
@@ -98,7 +99,7 @@ app.get('/api/state', (req, res) => {
   if (since === state.rev) return res.json({ rev: state.rev, unchanged: true });
   const visible = req.account.role === 'family' ? {
     patient:{name:state.patient.name,surgeryTs:state.patient.surgeryTs},
-    family:state.family,care:state.care,plan:{exercises:state.plan.exercises.map(e=>({id:e.id,reps:e.reps,modesEnabled:e.modesEnabled}))},
+    family:state.family,care:state.care,plan:{exercises:state.plan.exercises.map(e=>({id:e.id,reps:e.reps,modesEnabled:e.modesEnabled,modeSettings:e.modeSettings}))},
     issues:state.issues.map(i=>({id:i.id,status:i.status,tier:i.tier})),
     sessions:state.sessions.map(s=>({id:s.id,exercise:s.exercise,mode:s.mode,isTestSession:s.isTestSession,completedReps:s.reps?.filter(r=>r.complete).length || 0,ts:s.ts}))
   } : state;
@@ -152,7 +153,7 @@ app.post('/api/sessions', (req, res) => {
 app.post('/api/exercise-alerts', (req,res) => {
  if(req.account.role!=='patient')return res.status(403).json({error:'Only the patient camera can record this alert.'});
  const {runId,angle,mode,leg}=req.body||{};
- const max=state.plan.exercises.find(e=>e.id==='heel_slide')?.maxFlexion;
+ const max=exercisePrescription(state.plan,'heel_slide',mode).maxFlexion;
  if(typeof runId!=='string'||runId.length>100||!Number.isFinite(angle)||!max||angle<max||!['active','assisted'].includes(mode)||!['left','right'].includes(leg))return res.status(400).json({error:'Invalid exercise alert.'});
  state.exerciseAlerts ||= [];
  if(!state.exerciseAlerts.some(a=>a.runId===runId)){

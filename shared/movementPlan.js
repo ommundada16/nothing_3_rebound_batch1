@@ -1,6 +1,7 @@
 export function movementPlanError(plan) {
  if(!plan || !Array.isArray(plan.exercises) || !Array.isArray(plan.precautions)) return 'Check the exercise plan.';
- for(const e of plan.exercises) {
+ const entries=plan.exercises.flatMap(e=>[e,...Object.entries(e.modeSettings||{}).map(([mode,settings])=>({...e,...settings,modeSettings:null}))]);
+ for(const e of entries) {
   if(e.modesEnabled!=null && (!Array.isArray(e.modesEnabled)||e.modesEnabled.some(m=>!['active','assisted'].includes(m))))return 'Choose assisted or unassisted heel slides.';
   if(!Number.isInteger(e.reps) || e.reps<1 || e.reps>30 || !Number.isFinite(e.holdSec) || e.holdSec<1 || e.holdSec>30) return 'Choose 1–30 repetitions and a hold of 1–30 seconds.';
   const max=e.maxFlexion, target=e.targetFlexion;

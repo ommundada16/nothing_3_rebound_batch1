@@ -43,12 +43,17 @@ export function heelSlideTasks(plan) {
   const exercise = plan.exercises.find(e => e.id === 'heel_slide');
   if (!exercise) return [];
   return [
-    {...exercise, key:'heel-slide-active', mode:'active', name:'Heel slide — unassisted', description:'On your own'},
-    {...exercise, key:'heel-slide-assisted', mode:'assisted', name:'Heel slide — assisted', description:'With help'},
+    {...exercise, ...exercise.modeSettings?.active, key:'heel-slide-active', mode:'active', name:'Heel slide — unassisted', description:'On your own'},
+    {...exercise, ...exercise.modeSettings?.assisted, key:'heel-slide-assisted', mode:'assisted', name:'Heel slide — assisted', description:'With help'},
   ].filter(task => !exercise.modesEnabled || exercise.modesEnabled.includes(task.mode));
 }
 
 export function exerciseTaskDone(session, task) {
  const completed = session.completedReps ?? session.reps?.filter(r=>r.complete).length ?? 0;
  return !session.isTestSession && session.exercise === task.id && session.mode === task.mode && completed >= task.reps;
+}
+
+export function exercisePrescription(plan,id,mode){
+ const base=plan.exercises.find(e=>e.id===id)||{id,reps:8,holdSec:3};
+ return {...base,...base.modeSettings?.[mode]};
 }

@@ -96,3 +96,23 @@ export class LegMedianFilter {
  }
  reset(){this.frames=[];}
 }
+
+// Acquire an anatomical label once. Visibility changes must never select the
+// stationary leg behind it. Spatial continuity also catches label flips in Pose.
+export class LockedLegTracker {
+ constructor(){this.acquire=new AutoLegSelector();this.side=null;this.last=null;this.lastAt=0;}
+ update(landmarks,indices,width,height,now){
+  if(!this.side)this.side=this.acquire.update(landmarks,indices,now).side;
+  if(!this.side)return {side:null,leg:null,reason:'Finding your leg…'};
+  const leg=readLeg(landmarks,indices[this.side],width,height);
+  if(!leg||leg.confidence<.35)return {side:this.side,leg:null,reason:'The tracked leg is hidden. Keep the same leg in view.'};
+  if(this.last){
+   const size=Math.max(20,Math.hypot(this.last.hip.x-this.last.knee.x,this.last.hip.y-this.last.knee.y),Math.hypot(this.last.ankle.x-this.last.knee.x,this.last.ankle.y-this.last.knee.y));
+   const distance=Math.max(...['hip','knee','ankle'].map(k=>Math.hypot(leg[k].x-this.last[k].x,leg[k].y-this.last[k].y)))/size;
+   const allowance=.22+Math.min(.18,Math.max(0,now-this.lastAt)/1000*.5);
+   if(distance>allowance)return {side:this.side,leg:null,reason:'Leg position is uncertain. Keep the same leg visible or restart.'};
+  }
+  this.last=leg;this.lastAt=now;
+  return {side:this.side,leg,reason:''};
+ }
+}
