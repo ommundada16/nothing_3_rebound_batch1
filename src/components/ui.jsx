@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TIERS } from '../../shared/constants.js';
 import { legPose, SIM_H, SIM_W } from '../lib/sim.js';
 
@@ -55,10 +55,14 @@ export function Icon({ name, size = 22 }) {
 // ---------- charts ----------
 // series: [{name,color,points:[{x,y}],dashed,dots}], hLines: [{y,label,color}]
 export function LineChart({ series, hLines = [], yMin, yMax, xLabel = (x) => x, height = 220, unit = '°', xTicks = 6, annotations = [] }) {
-  const W = 640;
+  const containerRef=useRef(null);
+  const [chartWidth,setChartWidth]=useState(640);
+  const W = chartWidth;
   const H = height;
   const m = { l: 40, r: 14, t: 12, b: 28 };
   const all = series.flatMap((s) => s.points);
+  const hasPoints=all.length>0;
+  useEffect(()=>{const el=containerRef.current;if(!el)return;const resize=()=>setChartWidth(Math.max(280,Math.round(el.clientWidth)));resize();const observer=new ResizeObserver(resize);observer.observe(el);return()=>observer.disconnect();},[hasPoints]);
   if (!all.length) return <div className="muted small">No data yet.</div>;
   const xs = all.map((p) => p.x);
   const ys = [...all.map((p) => p.y), ...hLines.map((h) => h.y)];
@@ -73,25 +77,25 @@ export function LineChart({ series, hLines = [], yMin, yMax, xLabel = (x) => x, 
   const xt = Array.from({ length: Math.min(xTicks, x1 - x0 + 1) }, (_, i) => Math.round(x0 + ((x1 - x0) * i) / Math.max(1, Math.min(xTicks, x1 - x0 + 1) - 1)));
 
   return (
-    <div>
+    <div ref={containerRef}>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" style={{ display: 'block' }}>
         {ticks.map((t) => (
           <g key={t}>
             <line x1={m.l} x2={W - m.r} y1={Y(t)} y2={Y(t)} stroke="var(--line)" />
-            <text x={m.l - 6} y={Y(t) + 4} textAnchor="end" fontSize="11" fill="var(--muted)">
+            <text x={m.l - 6} y={Y(t) + 4} textAnchor="end" fontSize="12" fill="var(--muted)">
               {Math.round(t)}
             </text>
           </g>
         ))}
         {xt.map((t) => (
-          <text key={t} x={X(t)} y={H - 8} textAnchor="middle" fontSize="11" fill="var(--muted)">
+          <text key={t} x={X(t)} y={H - 8} textAnchor="middle" fontSize="12" fill="var(--muted)">
             {xLabel(t)}
           </text>
         ))}
         {hLines.map((h, i) => (
           <g key={i}>
             <line x1={m.l} x2={W - m.r} y1={Y(h.y)} y2={Y(h.y)} stroke={h.color || 'var(--muted)'} strokeDasharray="5 4" />
-            <text x={W - m.r - 4} y={Y(h.y) - 4} textAnchor="end" fontSize="11" fill={h.color || 'var(--muted)'}>
+            <text x={W - m.r - 4} y={Y(h.y) - 4} textAnchor="end" fontSize="12" fill={h.color || 'var(--muted)'}>
               {h.label}
             </text>
           </g>
@@ -99,7 +103,7 @@ export function LineChart({ series, hLines = [], yMin, yMax, xLabel = (x) => x, 
         {annotations.map((a, i) => (
           <g key={i}>
             <line x1={X(a.x)} x2={X(a.x)} y1={m.t} y2={H - m.b} stroke="var(--review)" strokeDasharray="3 3" />
-            <text x={X(a.x) + 4} y={m.t + 12} fontSize="11" fill="var(--review)">
+            <text x={X(a.x) + 4} y={m.t + 12} fontSize="12" fill="var(--review)">
               {a.label}
             </text>
           </g>

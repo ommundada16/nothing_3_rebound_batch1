@@ -1,3 +1,4 @@
+import CareTeam from './views/CareTeam.jsx';
 import { Component, useEffect, useState } from 'react';
 import { api, useStore } from './lib/api.js';
 import Account from './views/Account.jsx';
@@ -37,6 +38,7 @@ const ROLES = [
   { id: 'patient', label: 'Patient' },
   { id: 'physio', label: 'Physio' },
   { id: 'assistant', label: 'Assistant surgeon' },
+  {id:'careteam',label:'Care team'},
   { id: 'chain', label: 'Care chain' },
   { id: 'family', label: 'Family' },
   { id: 'future', label: 'Future' },
@@ -105,7 +107,7 @@ export default function App() {
 
       {error && (
         <div className="page" style={{ paddingBottom: 0 }}>
-          <div className="banner">Cannot reach the server ({error}). Start it with <b>npm run dev</b>.</div>
+          <div className="banner">Could not refresh this record: {error}. <button className="link-btn" onClick={store.refresh}>Retry</button></div>
         </div>
       )}
 
@@ -120,8 +122,8 @@ export default function App() {
           ) : currentRole === 'physio' ? (
             <Physio store={store} />
           ) : currentRole === 'assistant' ? (
-            <Physio store={store} assistant/>
-          ) : currentRole === 'chain' ? (
+            <CareTeam store={store}/>
+          ) : currentRole === 'careteam' ? (<CareTeam store={store}/>) : currentRole === 'chain' ? (
             <Chain store={store} />
           ) : currentRole === 'family' ? (
             <Family store={store} />

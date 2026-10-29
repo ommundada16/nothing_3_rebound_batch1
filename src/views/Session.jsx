@@ -458,6 +458,8 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         selfReport: self,
         durationS: summary.seconds,
         prescribedMaxFlexion:maxFlexion,
+        prescribedReps:planEx.reps,
+        prescribedHoldSec:planEx.holdSec,
         limitEvents:run.current.limitEvents,
         isTestSession:Boolean(run.current.selectedSide && run.current.selectedSide!==state.patient.leg)||run.current.source==='sim',
         captureStatus:summary.peak==null?'limited':'measured',

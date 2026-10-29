@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+let selectedPatient=null;
 async function req(method, url, body) {
   const res = await fetch(url, {
     method,
     cache: 'no-store',
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    headers:{...(body?{'Content-Type':'application/json'}:{}),...(selectedPatient?{'X-Patient-Id':selectedPatient}:{})},
     body: body ? JSON.stringify(body) : undefined,
   });
   const json = await res.json().catch(() => ({}));
@@ -13,6 +14,7 @@ async function req(method, url, body) {
 }
 
 export const api = {
+  selectPatient: id => {selectedPatient=id;},
   get: (url) => req('GET', url),
   post: (url, body) => req('POST', url, body || {}),
   put: (url, body) => req('PUT', url, body),
@@ -29,7 +31,7 @@ export const api = {
   async upload(blob, { kind = 'file', name = '' } = {}) {
     const res = await fetch(`/api/media?kind=${encodeURIComponent(kind)}&name=${encodeURIComponent(name)}`, {
       method: 'POST',
-      headers: { 'Content-Type': blob.type || 'application/octet-stream' },
+      headers: { 'Content-Type': blob.type || 'application/octet-stream',...(selectedPatient?{'X-Patient-Id':selectedPatient}:{}) },
       body: blob,
     });
     const json = await res.json().catch(() => ({}));
@@ -50,7 +52,9 @@ export function useStore(enabled = true) {
 
   const refresh = useCallback(async () => {
     try {
+      const requestedPatient=selectedPatient;
       const j = await api.get(`/api/state?since=${rev.current}`);
+      if(requestedPatient!==selectedPatient)return;
       if (!j.unchanged && j.rev >= rev.current) {
         rev.current = j.rev;
         fetchedAt.current = Date.now();
@@ -63,7 +67,7 @@ export function useStore(enabled = true) {
   }, []);
 
   useEffect(() => {
-    if (!enabled) { rev.current = 0; setState(null); return; }
+    if (!enabled) { rev.current = 0; selectedPatient=null;setState(null); return; }
     refresh();
     const t = setInterval(refresh, 1500);
     const wake=()=>{if(document.visibilityState==='visible')refresh();};
@@ -74,5 +78,6 @@ export function useStore(enabled = true) {
   // "Now" on the server's (possibly demo-advanced) clock.
   const now = useCallback(() => (state ? state.serverNow + (Date.now() - fetchedAt.current) : Date.now()), [state]);
 
-  return { state, error, refresh, now };
+  const selectPatient=async id=>{api.selectPatient(id);rev.current=0;const j=await api.get('/api/state');if(j.state?.patient.id!==id)throw new Error('Could not open this patient.');rev.current=j.rev;fetchedAt.current=Date.now();setState(j.state);};
+  return { state, error, refresh, now,selectPatient };
 }
