@@ -15,7 +15,7 @@ export function installAccounts(app, file) {
  app.get('/api/auth/me', (req,res) => res.json({user:req.account ? publicUser(req.account) : null}));
  app.post('/api/auth/register', (req,res) => {
   const {name, email, password, role} = req.body || {};
-  if(typeof name!=='string' || !name.trim() || typeof email!=='string' || !/^[^ @]+@[^ @]+\.[^ @]+$/.test(email) || typeof password!=='string' || password.length<8 || password.length>128 || !['patient','physio','family'].includes(role)) return res.status(400).json({error:'Enter a name, valid email and a password of 8–128 characters.'});
+  if(typeof name!=='string' || !name.trim() || typeof email!=='string' || !/^[^ @]+@[^ @]+\.[^ @]+$/.test(email) || typeof password!=='string' || password.length<8 || password.length>128 || !['patient','physio','family','assistant'].includes(role)) return res.status(400).json({error:'Enter a name, valid email and a password of 8–128 characters.'});
   if(users.some(u=>u.email===email.toLowerCase())) return res.status(400).json({error:'That email is already registered.'});
   if(users.some(u=>u.role===role)) return res.status(400).json({error:'This single-family prototype already has that account. Sign in with the existing account.'});
   const salt = randomBytes(16).toString('hex');

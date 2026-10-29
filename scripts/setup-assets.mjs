@@ -33,3 +33,12 @@ if (!existsSync(modelDst)) {
 } else {
   console.log('[setup] pose model already present');
 }
+
+const ocr=resolve(root,'public/ocr');
+if(existsSync(resolve(root,'node_modules/tesseract.js/dist/worker.min.js'))){
+ mkdirSync(resolve(ocr,'core'),{recursive:true});mkdirSync(resolve(ocr,'lang'),{recursive:true});
+ cpSync(resolve(root,'node_modules/tesseract.js/dist/worker.min.js'),resolve(ocr,'worker.min.js'));
+ cpSync(resolve(root,'node_modules/tesseract.js-core'),resolve(ocr,'core'),{recursive:true});
+ cpSync(resolve(root,'node_modules/@tesseract.js-data/eng/4.0.0/eng.traineddata.gz'),resolve(ocr,'lang/eng.traineddata.gz'));
+ console.log('[setup] copied local OCR worker and English model');
+}

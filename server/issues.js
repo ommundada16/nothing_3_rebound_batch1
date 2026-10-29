@@ -59,6 +59,7 @@ export function createIssueFromReport(state, report) {
     symptoms: report.symptoms || [],
     pain: report.pain ?? null,
     photoId: report.photoId || null,
+    medicineLabel: report.medicineLabel ? {text:String(report.medicineLabel.text||'').slice(0,20000),barcode:String(report.medicineLabel.barcode||'').slice(0,500),status:String(report.medicineLabel.status||'unverified'),confidence:Number(report.medicineLabel.confidence)||0} : null,
     voiceId: report.voiceId || null,
     reasons: result.reasons,
     guidance: result.guidance,
@@ -150,7 +151,7 @@ export function createIssueFromFlag(state, flag) {
 export function syncObjective(state) {
   const now = nowOf(state);
   const { flags } = analyze({
-    sessions: state.sessions.filter(s => s.exercise === 'heel_slide'),
+    sessions: state.sessions.filter(s => s.exercise === 'heel_slide' && !s.isTestSession && s.leg===state.patient.leg && s.ts>=state.patient.surgeryTs),
     now,
     surgeryTs: state.patient.surgeryTs,
     playbook: state.playbook,

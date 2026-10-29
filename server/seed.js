@@ -113,7 +113,7 @@ export function seedSessions(scenario, now) {
 }
 
 export function freshState(scenario = 'progressing', now = Date.now()) {
-  const surgeryTs = at10am(dayIndex(now) - 21);
+  const surgeryTs = at10am(dayIndex(now) - (scenario === 'stiff' ? 21 : 10));
   const state = {
     rev: 1,
     clockOffsetMs: 0,
@@ -146,7 +146,7 @@ export function freshState(scenario = 'progressing', now = Date.now()) {
     refVideos: { heel_slide: { stock: null, home: null }, slr: { stock: null, home: null } },
     family: { shareLevel: 'status', helperRequest: null, contact: 'Daughter' },
     clinicBaseline: CLINIC_BASELINE,
-    sessions: seedSessions(scenario, now),
+    sessions: seedSessions(scenario, now).filter(s => s.ts >= surgeryTs),
     issues: [],
     audit: [],
   };

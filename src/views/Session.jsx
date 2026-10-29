@@ -354,7 +354,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         clearInterval(r.pushTimer);
         const tag=guard.state === 'limit' ? 'angle_limit' : 'near_limit';
         const text=guard.state === 'limit' ? `Your prescribed maximum is ${maxFlexion} degrees. Stop bending and gently release.` : `You are close to your ${maxFlexion} degree limit. Do not bend further.`;
-        r.cues.play(tag,{priority:true,text:r.cues.hasRealClip(tag)?undefined:text,valid:()=>r.running&&r.guardStatus?.blocked});
+        r.cues.play(tag,{priority:true,text:r.cues.hasRealClip(tag)?undefined:text,valid:()=>r.running&&['near','limit'].includes(r.guardStatus?.state)});
         r.limitEvents.push({state:guard.state,angle:Math.round(raw),atMs:Math.round(now-r.startedPerf)});
         if(guard.state === 'limit')snap(value);
       }
@@ -395,7 +395,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         value: ok ? value : null,
         phase: r.counter.state,
         done: r.counter.completed,
-        tick: r.counter.state === 'holding' ? Math.min(planEx.holdSec, (now - r.counter.holdStart) / 1000) : 0,
+        tick: r.counter.state === 'holding' ? Math.min(planEx.holdSec, ((r.counter.gapStart ?? now) - r.counter.holdStart) / 1000) : 0,
         conf,
         low, guard:r.guardStatus.state, reason:quality.reason, quality:quality.quality, side:useSide,
       });

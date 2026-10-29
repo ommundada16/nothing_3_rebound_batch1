@@ -37,7 +37,7 @@ export const CUE_FALLBACK = {
 export const CARE_LEVELS = [
   { level: 1, id: 'visiting', title: 'Visiting physio', blurb: 'Home physio. First to see every concern.' },
   { level: 2, id: 'primary', title: 'Primary physio', blurb: 'Clinic physio. Sees patients every 2 weeks.' },
-  { level: 3, id: 'doctor', title: 'Assistant doctor', blurb: 'Medical review of anything the physios cannot settle.' },
+  { level: 3, id: 'doctor', title: 'Assistant surgeon', blurb: 'Medical review of anything the physios cannot settle.' },
   { level: 4, id: 'surgeon', title: 'Surgeon', blurb: 'Final escalation, and surgical decisions.' },
 ];
 

@@ -78,11 +78,15 @@ app.use('/api', (req,res,next) => {
  if(!req.account) return res.status(401).json({error:'Please sign in.'});
  const role=req.account.role;
  if(role === 'family' && req.method === 'POST' && req.path === '/sessions') return res.status(403).json({error:'Exercise sessions are recorded from the patient account.'});
- if(role !== 'physio' && (req.path.startsWith('/clock/') || req.path === '/reset' || req.path === '/ai/note' || /\/issues\/[^/]+\/action/.test(req.path))) return res.status(403).json({error:'Only the physio can do this.'});
- if(req.method === 'PUT' && req.path.startsWith('/state/')) {
+ const staff=['physio','assistant'].includes(role);
+ if(role !== 'physio' && (req.path.startsWith('/clock/') || req.path === '/reset'))return res.status(403).json({error:'Only the physio can use demo controls.'});
+ if(!staff && (req.path === '/ai/note' || /\/issues\/[^/]+\/action/.test(req.path)))return res.status(403).json({error:'Only the care team can do this.'});
+ if(req.method==='PUT' && req.path.startsWith('/state/')){
   const key=req.path.split('/').pop();
-  if(role !== 'physio' && !['care','family'].includes(key)) return res.status(403).json({error:'Only the physio can edit this plan.'});
+  const allowed=role==='physio' || role==='assistant'&&['care','patient'].includes(key) || ['care','family'].includes(key);
+  if(!allowed)return res.status(403).json({error:'Only the assigned care team can edit this plan.'});
  }
+
  next();
 });
 app.get('/api/household', (_req,res) => res.json({members:accounts.users.map(accounts.publicUser)}));
@@ -94,9 +98,9 @@ app.get('/api/state', (req, res) => {
   if (since === state.rev) return res.json({ rev: state.rev, unchanged: true });
   const visible = req.account.role === 'family' ? {
     patient:{name:state.patient.name,surgeryTs:state.patient.surgeryTs},
-    family:state.family,care:state.care,plan:{exercises:state.plan.exercises.map(e=>({id:e.id}))},
+    family:state.family,care:state.care,plan:{exercises:state.plan.exercises.map(e=>({id:e.id,reps:e.reps}))},
     issues:state.issues.map(i=>({id:i.id,status:i.status,tier:i.tier})),
-    sessions:state.sessions.map(s=>({id:s.id,exercise:s.exercise,mode:s.mode,completedReps:s.reps?.filter(r=>r.complete).length || 0,ts:s.ts}))
+    sessions:state.sessions.map(s=>({id:s.id,exercise:s.exercise,mode:s.mode,isTestSession:s.isTestSession,completedReps:s.reps?.filter(r=>r.complete).length || 0,ts:s.ts}))
   } : state;
   res.json({ rev: state.rev, state: { ...visible, serverNow: nowOf(state), scenarios: SCENARIOS, ai: Boolean(process.env.GROQ_API_KEY) } });
 });
@@ -120,8 +124,9 @@ app.put('/api/state/:key', (req, res) => {
   if (key === 'care') {
     const next = req.body.value;
     if (!validateCare(next)) return res.status(400).json({error:'Check the care plan fields and times.'});
-    if(req.account.role !== 'physio' && (JSON.stringify(next.medicines)!==JSON.stringify(state.care.medicines) || next.proteinTarget!==state.care.proteinTarget || JSON.stringify(next.appointments)!==JSON.stringify(state.care.appointments))) return res.status(403).json({error:'Only the care team can change medicines, targets or appointments.'});
+    if(!['physio','assistant'].includes(req.account.role) && (JSON.stringify(next.medicines)!==JSON.stringify(state.care.medicines) || next.proteinTarget!==state.care.proteinTarget || JSON.stringify(next.appointments)!==JSON.stringify(state.care.appointments))) return res.status(403).json({error:'Only the care team can change medicines, targets or appointments.'});
   }
+  if(key==='patient' && (!req.body.value || !Number.isFinite(req.body.value.surgeryTs)))return res.status(400).json({error:'Enter a valid surgery date.'});
   state[key] = req.body.value;
   state.audit.push({ id: randomUUID(), ts: nowOf(state), by: req.body.by || 'physio', text: `Updated ${key}` });
   commit();
@@ -131,7 +136,7 @@ app.put('/api/state/:key', (req, res) => {
 app.post('/api/sessions', (req, res) => {
   const s = req.body;
   if (!s?.exercise || !s?.mode) return res.status(400).json({ error: 'Bad session' });
-  const session = { ...s, id: s.id || randomUUID(), ts: s.ts || nowOf(state) };
+  const session = { ...s, isTestSession:Boolean(s.isTestSession || s.leg && s.leg!==state.patient.leg), id: s.id || randomUUID(), ts: s.ts || nowOf(state) };
   if (!state.sessions.some((x) => x.id === session.id)) state.sessions.push(session);
   const created = syncObjective(state);
   state.audit.push({
@@ -153,7 +158,7 @@ app.post('/api/issues', (req, res) => {
 });
 
 app.post('/api/issues/:id/action', (req, res) => {
-  const out = applyAction(state, req.params.id, req.body || {});
+  const out = applyAction(state, req.params.id, {...(req.body || {}),byLevel:req.account.role==='assistant'?3:1});
   if (out.error) return res.status(400).json(out);
   commit();
   res.json(out);

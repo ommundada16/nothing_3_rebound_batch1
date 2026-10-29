@@ -9,3 +9,5 @@ public/models/
 .DS_Store
 
 tmp/
+
+public/ocr/

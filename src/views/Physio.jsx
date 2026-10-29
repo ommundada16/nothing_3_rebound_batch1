@@ -8,46 +8,33 @@ import { Card, LegFigure, Lightbox, LineChart, Stat, TierBadge, Toast, useToast 
 import { CueStudio, PlanStudio, PlaybookStudio, VideoStudio } from './Studio.jsx';
 import DailyCare from './DailyCare.jsx';
 import Connections from './Connections.jsx';
+import FirstFortnight from './FirstFortnight.jsx';
+import ClinicalMessages from '../components/ClinicalMessages.jsx';
 import Validate from './Validate.jsx';
 
-export default function Physio({ store }) {
-  const { state, now, refresh } = store;
-  const [tab, setTab] = useState(Object.values(state.cues || {}).some(clips => clips.length) ? 'overview' : 'cues');
-  const toast = useToast();
-  const analysis = useMemo(
-    () => analyze({ sessions: state.sessions.filter(s => s.exercise === 'heel_slide'), now: now(), surgeryTs: state.patient.surgeryTs, playbook: state.playbook }),
-    [state, now],
-  );
-  const TABS = [
-    ['overview', 'Patient overview'],
-    ['connections', 'My account'],
-    ['care', 'Daily care'],
-    ['cues', 'My voice'],
-    ['videos', 'Videos'],
-    ['plan', 'Plan'],
-    ['playbook', 'My rules'],
-    ['validate', 'Accuracy check'],
-  ];
-  return (
-    <main className="page">
-      <div className="tabs">
-        {TABS.map(([id, l]) => (
-          <button key={id} className={`tab ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>
-            {l}
-          </button>
-        ))}
-      </div>
-      {tab === 'connections' && <Connections/>}
-      {tab === 'care' && <DailyCare store={store} editor/>}
-      {tab === 'overview' && <Overview state={state} now={now} analysis={analysis} />}
-      {tab === 'cues' && <CueStudio state={state} refresh={refresh} toast={toast.show} />}
-      {tab === 'videos' && <VideoStudio state={state} refresh={refresh} toast={toast.show} />}
-      {tab === 'plan' && <PlanStudio state={state} refresh={refresh} toast={toast.show} suggestions={analysis.suggestions} />}
-      {tab === 'validate' && <Validate />}
-      {tab === 'playbook' && <PlaybookStudio state={state} refresh={refresh} toast={toast.show} />}
-      <Toast msg={toast.msg} onDone={toast.clear} />
-    </main>
-  );
+export default function Physio({store,assistant=false}) {
+ const {state,now,refresh}=store;
+ const [selected,setSelected]=useState(false),[tab,setTab]=useState('summary');
+ const toast=useToast();
+ const analysis=useMemo(()=>analyze({sessions:state.sessions.filter(s=>s.exercise==='heel_slide'&&!s.isTestSession),now:now(),surgeryTs:state.patient.surgeryTs,playbook:state.playbook}),[state,now]);
+ const open=state.issues.filter(i=>i.status!=='resolved');
+ if(!selected)return <main className="page"><div className="stack"><div><p className="eyebrow">{assistant?'Assistant surgeon':'Physiotherapist'}</p><h1>Assigned patients</h1><p className="muted">Open a patient to see their recovery and care plan.</p></div><button className="assigned-patient card" onClick={()=>setSelected(true)}><span className="patient-avatar">{state.patient.name.charAt(0)}</span><span className="grow"><b>{state.patient.name}</b><span className="muted">{state.patient.procedure}</span><span className="small">{open.length?`${open.length} messages to review`:'No messages waiting'}</span></span><span aria-hidden="true">›</span></button><p className="tiny muted">One assigned patient in this prototype.</p></div></main>;
+ const tabs=assistant?[['summary','Summary'],['appointments','Appointments'],['care','Daily care'],['messages','Messages']]:[['summary','Summary'],['plan','Exercise plan'],['messages','Messages'],['care','Daily care']];
+ return <main className="page"><div className="stack"><button className="link-btn back-link" onClick={()=>{setSelected(false);setTab('summary');}}>‹ Assigned patients</button><div><h1>{state.patient.name}</h1><p className="muted">{state.patient.procedure}</p></div><div className="tabs">{tabs.map(([id,label])=><button key={id} className={`tab ${tab===id?'active':''}`} onClick={()=>setTab(id)}>{label}</button>)}</div>
+ {tab==='summary'&&<SimpleSummary store={store} onMessages={()=>setTab('messages')}/>}
+ {tab==='appointments'&&<FirstFortnight store={store}/>}
+ {tab==='care'&&<DailyCare store={store} editor/>}
+ {tab==='messages'&&<ClinicalMessages store={store}/>}
+ {tab==='plan'&&<PlanStudio state={state} refresh={refresh} toast={toast.show} suggestions={[]}/>}
+ {!assistant&&<details className="more"><summary>More tools: my voice, videos and measurement check</summary><div className="chips">{[['cues','My voice'],['videos','Reference videos'],['validate','Measurement check'],['playbook','Routing rules']].map(([id,label])=><button className={`chip ${tab===id?'on':''}`} key={id} onClick={()=>setTab(id)}>{label}</button>)}</div>{tab==='cues'&&<CueStudio state={state} refresh={refresh} toast={toast.show}/>} {tab==='videos'&&<VideoStudio state={state} refresh={refresh} toast={toast.show}/>} {tab==='validate'&&<Validate/>}{tab==='playbook'&&<PlaybookStudio state={state} refresh={refresh} toast={toast.show}/>}</details>}
+ </div><Toast msg={toast.msg} onDone={toast.clear}/></main>;
+}
+function SimpleSummary({store,onMessages}) {
+ const {state,now}=store;
+ const latest=mode=>[...state.sessions].filter(s=>s.exercise==='heel_slide'&&!s.isTestSession&&s.ts>=state.patient.surgeryTs&&s.mode===mode&&s.metrics?.peak!=null).sort((a,b)=>b.ts-a.ts)[0];
+ const appointments=state.care.appointments.filter(a=>a.at>=now()-86400000).sort((a,b)=>a.at-b.at);
+ const issues=state.issues.filter(i=>i.status!=='resolved');
+ return <div className="stack"><Card title="Recovery at a glance"><p>Day {dayPostOp(now(),state.patient.surgeryTs)} after surgery</p><div className="grid two">{[['active','Latest unassisted bend'],['assisted','Latest assisted bend']].map(([mode,label])=>{const session=latest(mode);return <div className="simple-metric" key={mode}><span>{label}</span><strong>{session?`${Math.round(session.metrics.peak)}°`:'No reading yet'}</strong><small>Camera estimate · not a clinical measurement</small></div>;})}</div></Card><Card title="Messages"><p>{issues.length?`${issues.length} messages are waiting for review.`:'No messages are waiting for review.'}</p><button className="btn primary" onClick={onMessages}>Open patient messages</button></Card><Card title="Next appointment">{appointments[0]?<><h3>{appointments[0].title}</h3><p>{new Date(appointments[0].at).toLocaleDateString('en-IN',{dateStyle:'medium',timeZone:'Asia/Kolkata'})}</p><p>{appointments[0].place}</p></>:<p>The assistant surgeon has not added the next date yet.</p>}</Card><details className="more"><summary>Recent exercise pictures</summary><div className="grid two">{[...state.sessions].filter(s=>s.exercise==='heel_slide'&&s.screenshotIds?.length).slice(-4).reverse().map(s=><Card key={s.id}><p>{s.mode==='active'?'Unassisted':'Assisted'} heel slide</p><img className="shot" src={mediaUrl(s.screenshotIds[0])} alt="Saved exercise moment"/></Card>)}</div></details></div>;
 }
 
 // What the pattern in the data suggests. Words are for the physio, not the patient.

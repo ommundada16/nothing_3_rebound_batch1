@@ -36,6 +36,7 @@ class Boundary extends Component {
 const ROLES = [
   { id: 'patient', label: 'Patient' },
   { id: 'physio', label: 'Physio' },
+  { id: 'assistant', label: 'Assistant surgeon' },
   { id: 'chain', label: 'Care chain' },
   { id: 'family', label: 'Family' },
   { id: 'future', label: 'Future' },
@@ -65,7 +66,7 @@ export default function App() {
   const [role, setRole] = useHashRole();
   const { state, error } = store;
 
-  const choices = user?.role === 'physio' ? ROLES.filter(r=>['physio','chain','future'].includes(r.id)) : ROLES.filter(r=>r.id===user?.role);
+  const choices = user?.role === 'physio' ? ROLES.filter(r=>['physio'].includes(r.id)) : ROLES.filter(r=>r.id===user?.role);
   const currentRole = choices.some(r=>r.id===role) ? role : user?.role;
   const goHome = () => { setRole(user?.role || 'patient'); setHomeVisit(n=>n+1); window.scrollTo(0,0); };
   const ready = u => {setUser(u);setRole(u.role);};
@@ -84,7 +85,7 @@ export default function App() {
             </span>
             Rebound
           </button>
-          <label className="view-select-wrap" style={{ marginLeft: 'auto' }}>
+          {choices.length>1 ? <label className="view-select-wrap" style={{ marginLeft: 'auto' }}>
             <span className="tiny muted" style={{ marginRight: 6 }}>
               View as
             </span>
@@ -95,7 +96,7 @@ export default function App() {
                 </option>
               ))}
             </select>
-          </label>
+          </label> : <span className="badge plain" style={{marginLeft:'auto'}}>{choices[0]?.label}</span>}
           <span className="account-name tiny">{user.name}</span>
           <button className="btn small" onClick={async()=>{await api.post('/api/auth/logout');setUser(null);}}>Sign out</button>
         </div>
@@ -117,6 +118,8 @@ export default function App() {
             <Patient store={store} />
           ) : currentRole === 'physio' ? (
             <Physio store={store} />
+          ) : currentRole === 'assistant' ? (
+            <Physio store={store} assistant/>
           ) : currentRole === 'chain' ? (
             <Chain store={store} />
           ) : currentRole === 'family' ? (
@@ -127,7 +130,7 @@ export default function App() {
         </Boundary>
       )}
 
-      {state && user.role === 'physio' && <DemoPanel store={store} setRole={setRole} />}
+      {state && user.role === 'physio' && new URLSearchParams(window.location.search).has('demo') && <DemoPanel store={store} setRole={setRole} />}
     </>
   );
 }
