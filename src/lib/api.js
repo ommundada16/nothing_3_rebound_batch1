@@ -17,6 +17,7 @@ export const api = {
   put: (url, body) => req('PUT', url, body),
   setKey: (key, value, by) => req('PUT', `/api/state/${key}`, { value, by }),
   saveSession: (s) => req('POST', '/api/sessions', s),
+  exerciseAlert: (body) => req('POST', '/api/exercise-alerts', body),
   reportIssue: (r) => req('POST', '/api/issues', r),
   issueAction: (id, body) => req('POST', `/api/issues/${id}/action`, body),
   followUp: (id, answer) => req('POST', `/api/issues/${id}/followup`, { answer }),

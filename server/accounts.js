@@ -1,6 +1,6 @@
 import { randomBytes, scryptSync, timingSafeEqual, randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-export function installAccounts(app, file) {
+export function installAccounts(app, file, onLogin = () => {}) {
  const users = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : [];
  const sessions = new Map();
  const publicUser = u => ({id:u.id, name:u.name, email:u.email, role:u.role});
@@ -20,7 +20,7 @@ export function installAccounts(app, file) {
   if(users.some(u=>u.role===role)) return res.status(400).json({error:'This single-family prototype already has that account. Sign in with the existing account.'});
   const salt = randomBytes(16).toString('hex');
   const user = {id:randomUUID(),name:name.trim(),email:email.toLowerCase(),role,salt,hash:scryptSync(password,salt,64).toString('hex')};
-  users.push(user);save();
+  users.push(user);save();onLogin(user);
   const token=randomBytes(32).toString('hex');sessions.set(token,{id:user.id,expires:Date.now()+86400000});cookie(req,res,token);
   res.json({user:publicUser(user)});
  });
@@ -31,6 +31,7 @@ export function installAccounts(app, file) {
   if(a.n>15)return res.status(429).json({error:'Too many attempts. Try again in a minute.'});
   const {email,password}=req.body || {};const u=users.find(u=>u.email===String(email).toLowerCase());
   if(!u || typeof password!=='string' || password.length>128 || !timingSafeEqual(Buffer.from(u.hash,'hex'),scryptSync(password,u.salt,64))) return res.status(401).json({error:'Email or password is incorrect.'});
+  onLogin(u);
   const token=randomBytes(32).toString('hex');sessions.set(token,{id:u.id,expires:Date.now()+86400000});cookie(req,res,token);res.json({user:publicUser(u)});
  });
  app.post('/api/auth/logout',(req,res)=>{const token=req.headers.cookie?.split(';').map(v=>v.trim()).find(v=>v.startsWith('pt_session='))?.slice(11);sessions.delete(token);cookie(req,res,'');res.json({ok:true});});

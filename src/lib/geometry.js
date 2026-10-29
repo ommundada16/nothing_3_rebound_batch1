@@ -61,3 +61,38 @@ export function bestSide(landmarks, LEG) {
   const score = (idx) => Math.min(landmarks[idx.hip]?.visibility ?? 0, landmarks[idx.knee]?.visibility ?? 0, landmarks[idx.ankle]?.visibility ?? 0);
   return score(LEG.left) >= score(LEG.right) ? 'left' : 'right';
 }
+
+// Require a sustained visibility advantage before changing anatomical sides.
+// Never splice the hip of one leg onto the knee/ankle of the other.
+export class AutoLegSelector {
+ constructor(){this.side=null;this.candidate=null;this.since=0;}
+ update(landmarks,indices,now){
+  const score=side=>Math.min(...Object.values(indices[side]).slice(0,3).map(i=>landmarks?.[i]?.visibility??0));
+  const left=score('left'),right=score('right');
+  const winner=left>=right?'left':'right';
+  const best=Math.max(left,right),current=this.side==='left'?left:right;
+  let changed=false;
+  if(best<.35){this.candidate=null;return {side:this.side,changed};}
+  const eligible=!this.side || winner!==this.side && best-current>.18;
+  if(eligible){
+   if(this.candidate!==winner){this.candidate=winner;this.since=now;}
+   if(now-this.since>=(!this.side?400:1200)){changed=Boolean(this.side);this.side=winner;this.candidate=null;}
+  }else this.candidate=null;
+  return {side:this.side,changed};
+ }
+}
+
+// A three-frame median removes a single bad joint prediction without the long
+// lag caused by repeatedly averaging an incorrect angle into the signal.
+export class LegMedianFilter {
+ constructor(){this.frames=[];}
+ push(leg){
+  if(!leg)return null;
+  this.frames.push(leg);if(this.frames.length>3)this.frames.shift();
+  if(this.frames.length<3)return leg;
+  const median=a=>a.sort((x,y)=>x-y)[1];
+  const joint=key=>({...leg[key],x:median(this.frames.map(f=>f[key].x)),y:median(this.frames.map(f=>f[key].y))});
+  return {...leg,hip:joint('hip'),knee:joint('knee'),ankle:joint('ankle')};
+ }
+ reset(){this.frames=[];}
+}

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { EXERCISES, LEG } from '../../shared/exercises.js';
 import { api } from '../lib/api.js';
 import { CuePlayer } from '../lib/cues.js';
-import { Smoother, bestSide, flexionFrom, liftFrom, readLeg } from '../lib/geometry.js';
+import { Smoother, AutoLegSelector, LegMedianFilter, flexionFrom, liftFrom, readLeg } from '../lib/geometry.js';
 import { detect, loadPose, openCamera } from '../lib/pose.js';
 import { TrackingQuality } from '../lib/trackingQuality.js';
 import { AngleGuard } from '../lib/angleGuard.js';
@@ -40,8 +40,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
 
   const [step, setStep] = useState('setup'); // setup | live | summary
   const [mode] = useState(initialMode);
-  const [side, setSide] = useState(()=>{try{return localStorage.getItem('rebound-camera-leg') || state.patient.leg || 'left';}catch{return state.patient.leg || 'left';}});
-  const chooseSide = value => {setSide(value);try{localStorage.setItem('rebound-camera-leg',value);}catch{}};
+  const side = 'auto';
   const [source, setSource] = useState('camera');
   const [facing, setFacing] = useState('user');
   const [err, setErr] = useState('');
@@ -141,9 +140,9 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
   const start = async () => {
     setErr('');
     const r = run.current;
-    r.shots = [];
-    r.timers=[]; r.finishing=false; r.lastVT=null; r.selectedSide=null; r.lastDisplayed=null;
-    r.quality=new TrackingQuality();r.trackingNotice=false;r.recoveredSince=null;
+    r.shots = []; r.runId=crypto.randomUUID(); r.alertSent=false;
+    r.timers=[]; r.finishing=false; r.lastVT=null; r.selectedSide=null; r.sideChanged=false; r.lastDisplayed=null;
+    r.jointFilter=new LegMedianFilter(); r.selector=new AutoLegSelector(); r.quality=new TrackingQuality();r.trackingNotice=false;r.recoveredSince=null;
     r.guard=new AngleGuard({maxFlexion,margin:Number(planEx.warningMarginDeg)||5});
     r.guardStatus={state:'unknown',blocked:true};
     r.limitEvents=[]; r.observedPeak=null;
@@ -203,7 +202,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         } catch {
           /* ignore */
         }
-        r.sim = createSim({ exercise: exerciseId, peak: prof.peak, deficit: prof.deficit, holdSec: planEx.holdSec, side, flawRep: flaw });
+        r.sim = createSim({ exercise: exerciseId, peak: prof.peak, deficit: prof.deficit, holdSec: planEx.holdSec, side: state.patient.leg, flawRep: flaw });
         r.w = SIM_W;
         r.h = SIM_H;
         setAspect(`${SIM_W} / ${SIM_H}`);
@@ -331,14 +330,17 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
       }
     }
 
-    const useSide = side === 'auto' ? (r.selectedSide || bestSide(landmarks, LEG)) : side;
-    const leg = readLeg(landmarks, LEG[useSide], w, h);
+    const selection = r.selector.update(landmarks, LEG, now);
+    const useSide = selection.side;
+    if(selection.changed){r.smoother.reset();r.quality=new TrackingQuality();r.counter.update(null,now+1000);r.selectedSide=useSide;r.sideChanged=true;setErr("The tracked leg changed. Restart with the same leg clearly visible.");finish();return;}
+    const observedLeg = useSide ? readLeg(landmarks, LEG[useSide], w, h) : null;
+    const leg = observedLeg?.confidence>=.35 ? r.jointFilter.push(observedLeg) : observedLeg;
+    if(!observedLeg || observedLeg.confidence<.35)r.jointFilter.reset();
     const conf = leg ? leg.confidence : 0;
     r.confSum += conf;
     r.confN += 1;
     const raw = leg ? (cfg.signal === 'flexion' ? flexionFrom(leg.hip,leg.knee,leg.ankle) : liftFrom(leg.hip,leg.knee)) : null;
     const quality=r.quality.assess(leg,w,h,raw);
-    if(!quality.accepted && leg && leg.confidence<.35){const other=readLeg(landmarks,LEG[useSide==='left'?'right':'left'],w,h);if(other?.confidence>=.5)quality.reason=`The other leg is clearer. Check the selected ${useSide} knee or adjust the side view.`;}
     const ok=quality.accepted;
 
     let value = null;
@@ -356,7 +358,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         const text=guard.state === 'limit' ? `Your prescribed maximum is ${maxFlexion} degrees. Stop bending and gently release.` : `You are close to your ${maxFlexion} degree limit. Do not bend further.`;
         r.cues.play(tag,{priority:true,text:r.cues.hasRealClip(tag)?undefined:text,valid:()=>r.running&&['near','limit'].includes(r.guardStatus?.state)});
         r.limitEvents.push({state:guard.state,angle:Math.round(raw),atMs:Math.round(now-r.startedPerf)});
-        if(guard.state === 'limit')snap(value);
+        if(guard.state === 'limit'){snap(value);if(r.source==='camera'&&!r.alertSent){r.alertSent=true;api.exerciseAlert({runId:r.runId,angle:raw,mode,leg:useSide}).catch(()=>{r.alertSent=false;});}}
       }
       r.counter.update(value, now);
       if(guard.state === 'limit')r.counter.invalidateLimit();
@@ -412,7 +414,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     const reps = r.counter.reps;
     const good = reps.filter((x) => x.complete);
     const pool = good.length ? good : reps;
-    const peak = r.validN < 10 || r.validN / Math.max(1,r.confN) < 0.6 ? null : pool.length ? Math.max(...pool.map((x) => x.peak)) : r.observedPeak;
+    const peak = r.sideChanged || r.validN < 10 || r.validN / Math.max(1,r.confN) < 0.6 ? null : pool.length ? Math.max(...pool.map((x) => x.peak)) : r.observedPeak;
     const deficits = r.repDeficits;
     const deficit = cfg.signal === 'lift' && deficits.length ? Math.round((deficits.reduce((a, b) => a + b, 0) / deficits.length) * 10) / 10 : null;
     setSummary({
@@ -477,11 +479,11 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
       <div className="stack exercise-setup">
         <button className="link-btn back-link" onClick={onExit}>‹ Back to exercises</button>
         <div><h1>{name}</h1><p className="muted">{mode === 'assisted' ? 'With help, as your physio showed you.' : 'Bend your knee using your own muscles.'}</p></div>
-        <fieldset className="knee-choice"><legend>Which knee are you tracking?</legend><div className="chips">{['left','right'].map(leg=><button type="button" className={`chip ${side===leg?'on':''}`} aria-pressed={side===leg} key={leg} onClick={()=>chooseSide(leg)}>{leg==='left'?'Left knee':'Right knee'}</button>)}</div>{side!==state.patient.leg&&<p className="small muted">Tracking the {side} knee for this test. The recovery plan is for the {state.patient.leg} knee.</p>}</fieldset>
+
         <RefVideos refVideos={state.refVideos} exerciseId={exerciseId} mode={mode} />
         <p className="exercise-prescription"><b>{planEx.reps} repetitions</b> · Hold for <b>{planEx.holdSec} seconds</b></p>
         <p>Move gently. Stop if you feel sharp pain.</p>
-        {source === 'camera' && <p className="small muted">Place the camera at your side. Keep your torso, hip, knee and ankle in view—not just your knee.</p>}
+        {source === 'camera' && <p className="small muted">The knee is selected automatically. Place the camera squarely beside your leg at knee height. Keep your torso, hip, knee and ankle visible.</p>}
         {maxFlexion && <p className="callout review">Prescribed maximum: <b>{maxFlexion}°</b>. The app warns before this estimated angle. Follow your doctor’s restriction.</p>}
         {err && <div className="callout urgent" role="alert">{err}</div>}
         <button className="btn primary big" onClick={start} disabled={loadingModel}>{loadingModel ? 'Getting ready…' : 'Start exercise'}</button>
@@ -539,7 +541,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
           </Card>
         )}
 
-        {summary.peak == null && <div className="callout review">No usable measurement was recorded. Reposition the camera so the hip, knee and ankle are visible, then try again.<button className="btn" onClick={()=>setStep('setup')}>Try again</button></div>}
+        {summary.peak == null && <div className="callout review">No consistent measurement was recorded. Keep the same leg in view with the hip, knee and ankle visible, then try again.<button className="btn" onClick={()=>setStep('setup')}>Try again</button></div>}
         <Card title="How was it?">
           <label className="field">Pain during the exercise: {self.pain} / 10</label>
           <input type="range" min="0" max="10" value={self.pain} onChange={(e) => setSelf({ ...self, pain: +e.target.value })} />
@@ -601,7 +603,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
           <div className="grow">
             <div style={{ fontWeight: 700 }}>{live.guard === 'limit' || live.guard === 'near' ? 'Do not bend further. Follow your prescribed limit.' : PHASE_TEXT[live.phase]}</div>
             <div className="small muted">
-              {mode === 'assisted' ? 'Assisted' : 'Unassisted'} · Tracking {live.side || side} knee · visibility {Math.round(live.conf * 100)}%
+              {mode === 'assisted' ? 'Assisted' : 'Unassisted'} · Tracking {live.side || 'detecting'} knee · visibility {Math.round(live.conf * 100)}%
             </div>
             <div className="meter" style={{ marginTop: 8 }}>
               <i style={{ width: `${Math.round(live.conf * 100)}%`, background: live.conf < 0.5 ? 'var(--urgent)' : 'var(--brand)' }} />

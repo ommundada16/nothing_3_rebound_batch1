@@ -21,3 +21,16 @@ assert.equal((await request('/api/state/care',{value:assistantCare},users.assist
 assert.equal((await request('/api/issues/'+report.data.issue.id+'/action',{action:'reply',text:'Photo and label reviewed',byLevel:4},users.assistant)).data.issue.thread.at(-1).by,3);
 const testSession=await request('/api/sessions',{id:'other-knee-validation',exercise:'heel_slide',mode:'active',leg:'right',reps:Array.from({length:8},()=>({complete:true})),metrics:{peak:80}},users.patient);assert.equal(testSession.data.session.isTestSession,true);
 console.log('PASS: account creation/sign-in, shared care, prescription protection, family privacy, side-effect routing, both video references.');
+const originalPlan=structuredClone(state.plan);
+assert.ok(state.activity.patientLastLogin);
+const plan={...state.plan,exercises:[{...state.plan.exercises.find(e=>e.id==='heel_slide'),modesEnabled:['assisted'],maxFlexion:90,targetFlexion:60}]};
+assert.equal((await request('/api/state/plan',{value:plan},users.physio,'PUT')).status,200);
+const alert={runId:'qa-limit-'+Date.now(),angle:92,mode:'assisted',leg:state.patient.leg};
+assert.equal((await request('/api/exercise-alerts',alert,users.family)).status,403);
+assert.equal((await request('/api/exercise-alerts',alert,users.patient)).status,200);
+assert.equal((await request('/api/exercise-alerts',alert,users.patient)).status,200);
+const updated=(await request('/api/state',null,users.physio,'GET')).data.state;
+assert.equal(updated.exerciseAlerts.filter(a=>a.runId===alert.runId).length,1);
+assert.deepEqual(updated.plan.exercises[0].modesEnabled,['assisted']);
+assert.equal((await request('/api/state/plan',{value:originalPlan},users.physio,'PUT')).status,200);
+console.log('PASS: recorded login, selected exercise modes, live limit alert authorization and deduplication.');

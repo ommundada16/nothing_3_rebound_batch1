@@ -45,7 +45,7 @@ export function heelSlideTasks(plan) {
   return [
     {...exercise, key:'heel-slide-active', mode:'active', name:'Heel slide — unassisted', description:'On your own'},
     {...exercise, key:'heel-slide-assisted', mode:'assisted', name:'Heel slide — assisted', description:'With help'},
-  ];
+  ].filter(task => !exercise.modesEnabled || exercise.modesEnabled.includes(task.mode));
 }
 
 export function exerciseTaskDone(session, task) {

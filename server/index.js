@@ -58,7 +58,7 @@ function commit() {
 
 const app = express();
 app.use(express.json({ limit: '8mb' }));
-const accounts = installAccounts(app, resolve(DATA_DIR, 'accounts.json'));
+const accounts = installAccounts(app, resolve(DATA_DIR, 'accounts.json'), user => {if(user.role==='patient'){state.activity={...state.activity,patientLastLogin:nowOf(state)};commit();}});
 if (!state.care) { state.care = emptyCare(); commit(); }
 if (state.plan.exercises.some(e => e.id !== 'heel_slide')) { state.plan.exercises = state.plan.exercises.filter(e => e.id === 'heel_slide'); commit(); }
 if (!process.env.PHYSIO_SKIP_IMPORT) {
@@ -98,7 +98,7 @@ app.get('/api/state', (req, res) => {
   if (since === state.rev) return res.json({ rev: state.rev, unchanged: true });
   const visible = req.account.role === 'family' ? {
     patient:{name:state.patient.name,surgeryTs:state.patient.surgeryTs},
-    family:state.family,care:state.care,plan:{exercises:state.plan.exercises.map(e=>({id:e.id,reps:e.reps}))},
+    family:state.family,care:state.care,plan:{exercises:state.plan.exercises.map(e=>({id:e.id,reps:e.reps,modesEnabled:e.modesEnabled}))},
     issues:state.issues.map(i=>({id:i.id,status:i.status,tier:i.tier})),
     sessions:state.sessions.map(s=>({id:s.id,exercise:s.exercise,mode:s.mode,isTestSession:s.isTestSession,completedReps:s.reps?.filter(r=>r.complete).length || 0,ts:s.ts}))
   } : state;
@@ -147,6 +147,19 @@ app.post('/api/sessions', (req, res) => {
   });
   commit();
   res.json({ session, newFlags: created.map((i) => ({ id: i.id, title: i.title, tier: i.tier })) });
+});
+
+app.post('/api/exercise-alerts', (req,res) => {
+ if(req.account.role!=='patient')return res.status(403).json({error:'Only the patient camera can record this alert.'});
+ const {runId,angle,mode,leg}=req.body||{};
+ const max=state.plan.exercises.find(e=>e.id==='heel_slide')?.maxFlexion;
+ if(typeof runId!=='string'||runId.length>100||!Number.isFinite(angle)||!max||angle<max||!['active','assisted'].includes(mode)||!['left','right'].includes(leg))return res.status(400).json({error:'Invalid exercise alert.'});
+ state.exerciseAlerts ||= [];
+ if(!state.exerciseAlerts.some(a=>a.runId===runId)){
+  state.exerciseAlerts.push({id:randomUUID(),runId,ts:nowOf(state),angle,maximum:max,mode,leg,isTestSession:leg!==state.patient.leg});
+  state.exerciseAlerts=state.exerciseAlerts.slice(-200);commit();
+ }
+ res.json({ok:true});
 });
 
 app.post('/api/issues', (req, res) => {
