@@ -1,3 +1,7 @@
+# Rebound
+
+Carry your physio home. A Srujana Hackathon prototype for early recovery after knee replacement, focused on the first two weeks.
+
 ## Hosting on Vercel
 
 Use Vercel for the Vite website and a single persistent Render Node service for the API. Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The actual Render URL must be configured in `vercel.json` before the Vercel build succeeds. No hosted service has been created yet. The Render blueprint requires a paid persistent-disk plan.
@@ -24,10 +28,6 @@ This section overrides earlier UI/OCR/side-selection descriptions below.
 - Exercise plan shows separate assisted/unassisted +/− toggles and shared reps, hold and optional maximum bend. Saving drops the old hidden target; the engine uses its existing safe target under the max. Removing a mode removes that patient task. Existing precaution data is retained but no notes editor is shown.
 - Camera side selection is automatic using MediaPipe anatomical labels and sustained visibility evidence: 400 ms initially, 1200 ms plus an advantage before a side change. A three-frame joint median filters isolated landmark spikes. No manual knee choice or saved side preference. If the side changes during a session, finish without a savable measurement to avoid mixing knees. Side-view occlusion can still confuse model labels; this is NOT clinical accuracy validation.
 - Verified: 49 unit tests, production build, isolated API tests for login time, exercise modes, limit-event permissions and deduplication, and browser checks for search, Today-first navigation, recorded login, single chat, typed medicine report and simplified plan. Actual laptop webcam accuracy requires a physical retest.
-
-# Rebound
-
-Carry your physio home. A Srujana Hackathon prototype for early recovery after knee replacement, focused on the first two weeks.
 
 ## Accounts
 
