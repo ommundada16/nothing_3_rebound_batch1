@@ -292,7 +292,7 @@ export default function Validate() {
                       {r.truth != null ? (
                         <span>{r.truth}° (sim)</span>
                       ) : (
-                        <input type="number" value={r.ref ?? ''} onChange={(e) => setRef(r.id, e.target.value)} style={{ width: 90, padding: 6 }} aria-label="Reference angle in degrees" />
+                        <input type="number" placeholder="e.g. 80" value={r.ref ?? ''} onChange={(e) => setRef(r.id, e.target.value)} style={{ width: 90, padding: 6 }} aria-label="Reference angle in degrees" />
                       )}
                     </td>
                     <td>{t != null ? `${(r.measured - t).toFixed(1)}°` : '–'}</td>

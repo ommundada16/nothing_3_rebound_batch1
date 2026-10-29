@@ -1,3 +1,4 @@
+import {useBack} from '../lib/navigation.js';
 import {EXERCISE_CATALOGUE} from '../../shared/exerciseCatalogue.js';
 import Progress from '../components/Progress.jsx';
 import Sessions from '../components/Sessions.jsx';
@@ -15,6 +16,7 @@ import Companion from './Companion.jsx';
 export default function Patient({store,onVision}) {
  const {state,now,refresh}=store;
  const [tab,setTab]=useState('home'),[session,setSession]=useState(null);const toast=useToast();
+ useBack(()=>setTab('home'),!session&&tab!=='home',10);
  const tasks=heelSlideTasks(state.plan),today=sessionsToday(state.sessions,now());
  const done=tasks.filter(t=>today.some(s=>exerciseTaskDone(s,t))).length;
  if(session)return <main className="page"><Session state={state} exerciseId={session.id} initialMode={session.mode} toast={toast.show} onExit={()=>{setSession(null);refresh();}}/><Toast msg={toast.msg} onDone={toast.clear}/></main>;

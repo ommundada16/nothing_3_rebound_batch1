@@ -1,3 +1,4 @@
+import {navigateBack} from './lib/navigation.js';
 import CareTeam from './views/CareTeam.jsx';
 import { Component, useEffect, useState } from 'react';
 import { api, useStore } from './lib/api.js';
@@ -72,13 +73,15 @@ export default function App() {
   const choices = user?.role === 'physio' ? ROLES.filter(r=>['physio'].includes(r.id)) : ROLES.filter(r=>r.id===user?.role);
   const currentRole = choices.some(r=>r.id===role) ? role : user?.role;
   const goHome = () => { setVision(false); setRole(user?.role || 'patient'); setHomeVisit(n=>n+1); window.scrollTo(0,0); };
+
   const ready = u => {setVision(false);setUser(u);setRole(u.role);};
   if(checking) return <main className="page"><p>Opening Rebound…</p></main>;
-  if(!user) return <><header className="topbar"><div className="topbar-inner"><a className="brand brand-home" href="/">Rebound</a></div></header>{authError&&<p className="page" role="alert">Cannot connect: {authError}. Start the server and refresh.</p>}<Account onReady={ready}/></>;
+  if(!user) return <><header className="topbar"><div className="topbar-inner"><button className="global-back" aria-label="Go back" onClick={()=>navigateBack()}>‹ <span>Back</span></button><a className="brand brand-home" href="/">Rebound</a></div></header>{authError&&<p className="page" role="alert">Cannot connect: {authError}. Start the server and refresh.</p>}<Account onReady={ready}/></>;
   return (
     <>
       <header className="topbar">
         <div className="topbar-inner">
+          <button className="global-back" aria-label="Go back" onClick={()=>{if(vision)setVision(false);else if(!navigateBack())goHome();}}>‹ <span>Back</span></button>
           <button type="button" className="brand brand-home" onClick={goHome} aria-label="Rebound home">
             <span className="brand-mark">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -100,7 +103,7 @@ export default function App() {
               ))}
             </select>
           </label> : <span className="badge plain" style={{marginLeft:'auto'}}>{choices[0]?.label}</span>}
-          <button className="link-btn header-vision" onClick={()=>setVision(v=>!v)}>{vision?'My account':'Our vision'}</button><span className="account-name tiny">{user.name}</span>
+          <button className="link-btn header-vision" onClick={()=>setVision(v=>!v)}>{vision?'My account':'Our vision'}</button>{user.isDemo&&<span className="demo-badge">Demo</span>}<span className="account-name tiny">{user.name}</span>
           <button className="btn small" onClick={async()=>{await api.post('/api/auth/logout');setUser(null);}}>Sign out</button>
         </div>
       </header>
@@ -122,7 +125,7 @@ export default function App() {
           ) : currentRole === 'physio' ? (
             <Physio store={store} />
           ) : currentRole === 'assistant' ? (
-            <CareTeam store={store}/>
+            <Physio store={store} assistant/>
           ) : currentRole === 'careteam' ? (<CareTeam store={store}/>) : currentRole === 'chain' ? (
             <Chain store={store} />
           ) : currentRole === 'family' ? (
