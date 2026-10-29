@@ -1,3 +1,5 @@
+import {AsyncLocalStorage} from 'node:async_hooks';
+import {installCareRegistry} from './careRegistry.js';
 import express from 'express';
 import { installAccounts } from './accounts.js';
 import { exercisePrescription, heelSlideTasks } from '../shared/exercises.js';
@@ -40,17 +42,26 @@ function loadDotEnv() {
   }
 }
 
-let state = existsSync(STATE_FILE) ? JSON.parse(readFileSync(STATE_FILE, 'utf8')) : null;
+let legacyState = existsSync(STATE_FILE) ? JSON.parse(readFileSync(STATE_FILE, 'utf8')) : null;
 let media = existsSync(MEDIA_INDEX) ? JSON.parse(readFileSync(MEDIA_INDEX, 'utf8')) : {};
 
-if (!state) {
-  state = freshState('progressing');
+const context=new AsyncLocalStorage();
+const record=()=>context.getStore()?.state||legacyState;
+const state=new Proxy({}, {
+ get:(_t,key)=>record()?.[key],
+ set:(_t,key,value)=>{record()[key]=value;return true;},
+ ownKeys:()=>Reflect.ownKeys(record()||{}),
+ getOwnPropertyDescriptor:(_t,key)=>Object.hasOwn(record()||{},key)?{configurable:true,enumerable:true,writable:true,value:record()[key]}:undefined,
+});
+
+if (!legacyState) {
+  legacyState = freshState('progressing');
   syncObjective(state);
   persist();
 }
 
 function persist() {
-  writeFileSync(STATE_FILE, JSON.stringify(state));
+  writeFileSync(context.getStore()?.file||STATE_FILE, JSON.stringify(record()));
 }
 function commit() {
   state.rev += 1;
@@ -59,7 +70,8 @@ function commit() {
 
 const app = express();
 app.use(express.json({ limit: '8mb' }));
-const accounts = installAccounts(app, resolve(DATA_DIR, 'accounts.json'), user => {if(user.role==='patient'){state.activity={...state.activity,patientLastLogin:nowOf(state)};commit();}});
+let registry;
+const accounts = installAccounts(app, resolve(DATA_DIR, 'accounts.json'), user => registry?.recordLogin(user));
 if (!state.care) { state.care = emptyCare(); commit(); }
 if (state.plan.exercises.some(e => e.id !== 'heel_slide')) { state.plan.exercises = state.plan.exercises.filter(e => e.id === 'heel_slide'); commit(); }
 if (!process.env.PHYSIO_SKIP_IMPORT) {
@@ -73,24 +85,25 @@ if (!process.env.PHYSIO_SKIP_IMPORT) {
   }
  }
 }
+registry=installCareRegistry(app,{dir:DATA_DIR,accounts,legacy:{state:legacyState,file:STATE_FILE},context});
 // This build supports one patient, one assigned physio and one guardian.
 app.use('/api', (req,res,next) => {
  if(req.path.startsWith('/auth/') || req.path === '/health') return next();
  if(!req.account) return res.status(401).json({error:'Please sign in.'});
  const role=req.account.role;
  if(role === 'family' && req.method === 'POST' && req.path === '/sessions') return res.status(403).json({error:'Exercise sessions are recorded from the patient account.'});
- const staff=['physio','assistant'].includes(role);
+ const staff=['physio','assistant','careteam'].includes(role);
  if(role !== 'physio' && (req.path.startsWith('/clock/') || req.path === '/reset'))return res.status(403).json({error:'Only the physio can use demo controls.'});
  if(!staff && (req.path === '/ai/note' || /\/issues\/[^/]+\/action/.test(req.path)))return res.status(403).json({error:'Only the care team can do this.'});
  if(req.method==='PUT' && req.path.startsWith('/state/')){
   const key=req.path.split('/').pop();
-  const allowed=role==='physio' || role==='assistant'&&['care','patient'].includes(key) || ['care','family'].includes(key);
+  const allowed=role==='physio' || ['assistant','careteam'].includes(role)&&['care','patient'].includes(key) || ['care','family'].includes(key);
   if(!allowed)return res.status(403).json({error:'Only the assigned care team can edit this plan.'});
  }
 
  next();
 });
-app.get('/api/household', (_req,res) => res.json({members:accounts.users.map(accounts.publicUser)}));
+app.get('/api/household', (_req,res) => res.json({members:registry.household(_req.account,_req.patientId)}));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, rev: state.rev, ai: Boolean(process.env.GROQ_API_KEY) }));
 
@@ -110,7 +123,9 @@ app.post('/api/reset', (req, res) => {
   const scenario = SCENARIOS[req.body?.scenario] ? req.body.scenario : 'progressing';
   const rev = state.rev + 1;
   const retained = {care:state.care,cues:state.cues,cueLanguage:state.cueLanguage,refVideos:state.refVideos};
-  state = {...freshState(scenario), ...retained};
+  const replacement={...freshState(scenario), ...retained,patient:state.patient};
+  for(const key of Object.keys(record()))delete record()[key];
+  Object.assign(record(),replacement);
   state.rev = rev;
   syncObjective(state);
   persist();
@@ -125,7 +140,7 @@ app.put('/api/state/:key', (req, res) => {
   if (key === 'care') {
     const next = req.body.value;
     if (!validateCare(next)) return res.status(400).json({error:'Check the care plan fields and times.'});
-    if(!['physio','assistant'].includes(req.account.role) && (JSON.stringify(next.medicines)!==JSON.stringify(state.care.medicines) || next.proteinTarget!==state.care.proteinTarget || JSON.stringify(next.appointments)!==JSON.stringify(state.care.appointments))) return res.status(403).json({error:'Only the care team can change medicines, targets or appointments.'});
+    if(!['physio','assistant','careteam'].includes(req.account.role) && (JSON.stringify(next.medicines)!==JSON.stringify(state.care.medicines) || next.proteinTarget!==state.care.proteinTarget || JSON.stringify(next.appointments)!==JSON.stringify(state.care.appointments))) return res.status(403).json({error:'Only the care team can change medicines, targets or appointments.'});
   }
   if(key==='patient' && (!req.body.value || !Number.isFinite(req.body.value.surgeryTs)))return res.status(400).json({error:'Enter a valid surgery date.'});
   state[key] = req.body.value;
@@ -172,7 +187,7 @@ app.post('/api/issues', (req, res) => {
 });
 
 app.post('/api/issues/:id/action', (req, res) => {
-  const out = applyAction(state, req.params.id, {...(req.body || {}),byLevel:req.account.role==='assistant'?3:1});
+  const out = applyAction(state, req.params.id, {...(req.body || {}),byLevel:['assistant','careteam'].includes(req.account.role)?3:1});
   if (out.error) return res.status(400).json(out);
   commit();
   res.json(out);
@@ -206,6 +221,7 @@ app.post('/api/media', express.raw({ type: () => true, limit: '120mb' }), (req, 
   const id = randomUUID();
   writeFileSync(resolve(MEDIA_DIR, id), req.body);
   media[id] = {
+    patientId:req.patientId,
     mime: String(req.headers['content-type'] || 'application/octet-stream').split(';')[0],
     kind: String(req.query.kind || 'file'),
     name: String(req.query.name || id),
@@ -219,8 +235,10 @@ app.get('/api/media/:id', (req, res) => {
   const m = media[req.params.id];
   const f = resolve(MEDIA_DIR, req.params.id);
   if (!m || !existsSync(f)) return res.status(404).end();
+  const sharedReference=[legacyState.refVideos?.heel_slide?.stock_active,legacyState.refVideos?.heel_slide?.stock_assisted].includes(req.params.id);
+  if(!sharedReference&&(!registry.canAccess(req.account,m.patientId||'p1')||req.account.role==='family'))return res.status(403).end();
   res.setHeader('Content-Type', m.mime);
-  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  res.setHeader('Cache-Control', 'private, max-age=3600');
   res.sendFile(f);
 });
 
@@ -263,8 +281,7 @@ if (existsSync(DIST)) {
 }
 
 setInterval(() => {
-  const newFlags = syncObjective(state);
-  if (tick(state) || newFlags.length) commit();
+  for(const c of registry.contexts())context.run(c,()=>{const newFlags=syncObjective(state);if(tick(state)||newFlags.length)commit();});
 }, 5000);
 
 app.listen(PORT, '0.0.0.0', () => {

@@ -1,5 +1,7 @@
+import {EXERCISE_CATALOGUE} from './exerciseCatalogue.js';
 export function movementPlanError(plan) {
  if(!plan || !Array.isArray(plan.exercises) || !Array.isArray(plan.precautions)) return 'Check the exercise plan.';
+ if(plan.catalogueIds!=null&&(!Array.isArray(plan.catalogueIds)||plan.catalogueIds.some(id=>!EXERCISE_CATALOGUE.some(e=>e.id===id))))return 'Choose exercises from the catalogue.';
  const entries=plan.exercises.flatMap(e=>[e,...Object.entries(e.modeSettings||{}).map(([mode,settings])=>({...e,...settings,modeSettings:null}))]);
  for(const e of entries) {
   if(e.modesEnabled!=null && (!Array.isArray(e.modesEnabled)||e.modesEnabled.some(m=>!['active','assisted'].includes(m))))return 'Choose assisted or unassisted heel slides.';
