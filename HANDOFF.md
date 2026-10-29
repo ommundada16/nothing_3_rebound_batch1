@@ -1,3 +1,13 @@
+## Companion interface redesign — 29 October 2026
+
+- Patient navigation is now Home, Companion, My sessions and Care team. Replaced the old graph-heavy patient page with a calm home, original SVG robot concept, two prescribed exercise cards and session history. Existing physio/assistant/family accounts remain; shared styling is green/cream with orange actions.
+- Our vision is available from every authenticated account. Future.jsx is a three-stage interactive concept walkthrough (everyday activity, exercise, human review), clearly separating working camera/messages from proposed robot and manufacturer-authorised implant integration. No robot, sensor, live implant data, partnership or general AI is claimed.
+- Companion.jsx uses explicit guided FAQ answers, optional text-to-speech and the existing report/call-request endpoints. In-app call requests are not automatic phone calls or an emergency service. General treatment decisions remain with clinicians.
+- Live exercise is a fixed full-screen camera workspace with one instruction line, angle/rep overlays, Mute, Camera help and Finish & save. Detailed guidance is now an on-demand modal. Setup/reference videos remain before starting. Existing camera inference was retained; no new accuracy claim.
+- Poor capture no longer disables Save or suggests repeating a set. Save preserves a limited attempt with null angle, available evidence, captureStatus and optional patientReportedCompletion. Reported completion is labelled separately from measured reps in patient/physio views; it never manufactures reps or angles. Other-knee/demo sessions remain practice. Family projection includes completion metadata, not private pictures.
+- New fictional seeded plans use a 2-second hold. Existing clinician prescriptions are preserved. The demo animation respects the current maximum by default, while safety tests still cover limit crossings.
+- Verified 64 unit tests, production build, account/API integration checks (including limited reports and family privacy), desktop home, guided companion, interactive vision, phone width without horizontal overflow, full-screen simulation, and an immediately stopped zero-measurement session saving successfully to My sessions. All browser mutations were isolated tmp/review-data. Actual physical camera accuracy remains unverified.
+
 ## Detection recovery and camera help — 29 October 2026
 
 - Fixed initial acquisition starvation when visibility winners alternate: initial side is selected from accumulated scores over 400 ms, rather than requiring an uninterrupted winner.
