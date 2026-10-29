@@ -1,3 +1,15 @@
+## Daily-highest graphs, role separation and named demos — 29 October 2026
+
+This section overrides earlier practice-checkbox and shared assistant/care-team descriptions.
+
+- Root cause of the empty actual graph: all four existing camera sessions were tagged isTestSession by the old left-knee demo profile. Progress now includes saved finite actual readings automatically and computes one highest angle per IST day, with a daily change table. Removed the other-knee checkbox. Exercise filtering is a plain optional All / Unassisted / Assisted select; per-reading knee/source remains visible. Do not infer clinical improvement from mixed knees or modalities. Old seeded data and camera animations remain excluded.
+- Demo graph readings use cameraSource=demo and are only plotted when state.isDemo=true. All demo measurements are explicitly fictional, including their SVG snapshot illustrations. Actual and demo progress streams remain separate.
+- Assistant surgeons have a distinct assigned-patient clinical portal, starting with appointments. They can review clinical messages but cannot enrol patients, assign staff or manage robots. Care-team admins keep the operations portal and can view records without sending clinical replies. Patient records have assistantId plus physioId; enrolment/assignment supports both. Multiple assistant/care-team registrations are now possible.
+- Added idempotent startup seeding of 14 demo accounts: 3 physios, 3 assistants, 3 care-team users and 5 patients in Pune/Mumbai areas. See docs/DEMO_ACCOUNTS.md. Reserved .example emails and the shared password are for fictional accounts only. Demo/live scope is checked on record reads, private media, clinician directories, enrolment and assignment; demo admin access cannot reach non-demo records or devices.
+- Desktop pages now use almost the full width with modest padding. Mobile header wraps rather than overflowing. Added examples/placeholders to enrolment, sign-in, prescription and support fields.
+- A global top-left back button uses a priority-based navigation stack: detail -> list -> overview -> directory/home. Live camera Back stops into session review, preserving the current attempt. No automatic browser-history exit or role switching.
+- Verified 72 unit tests/build, multi-patient integration checks, and a separate 14-account demo/RBAC test. Browser verified demo chooser, named physio login, daily-highest graph, back-button hierarchy and assistant clinical portal. Existing actual camera inference and surgery details were not changed.
+
 ## Progress, session records and care-team enrolment — 29 October 2026
 
 This section supersedes earlier single-patient/account and Summary descriptions.
