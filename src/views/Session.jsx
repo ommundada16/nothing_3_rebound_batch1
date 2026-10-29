@@ -142,7 +142,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     setErr('');
     const r = run.current;
     r.shots = [];
-    r.timers=[]; r.finishing=false; r.lastVT=null; r.selectedSide=null;
+    r.timers=[]; r.finishing=false; r.lastVT=null; r.selectedSide=null; r.lastDisplayed=null;
     r.quality=new TrackingQuality();r.trackingNotice=false;r.recoveredSince=null;
     r.guard=new AngleGuard({maxFlexion,margin:Number(planEx.warningMarginDeg)||5});
     r.guardStatus={state:'unknown',blocked:true};
@@ -345,7 +345,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     if (ok) {
       r.validN+=1; r.lastValidFrame=now;
       if(!r.selectedSide)r.selectedSide=useSide;
-      value = r.smoother.push(raw);
+      value = r.smoother.push(raw); r.lastDisplayed=value;
       r.lastPose = { hip: leg.hip, knee: leg.knee, ankle: leg.ankle };
       r.observedPeak = Math.max(r.observedPeak ?? 0,value);
       const guard=r.guard.update(Math.max(raw,value),now);
@@ -392,7 +392,8 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     if (now - r.lastUi > 90) {
       r.lastUi = now;
       setLive({
-        value: ok ? value : null,
+        value: ok ? value : now-(r.lastValidFrame ?? -Infinity)<500?r.lastDisplayed:null,
+        paused:!ok,
         phase: r.counter.state,
         done: r.counter.completed,
         tick: r.counter.state === 'holding' ? Math.min(planEx.holdSec, ((r.counter.gapStart ?? now) - r.counter.holdStart) / 1000) : 0,
@@ -577,7 +578,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         </div>
         <div className="hud-angle">
           <div className="n">{live.value != null ? Math.round(live.value) : '--'}°</div>
-          <div className="l">{unit}</div>
+          <div className="l">{live.paused ? 'Last estimate' : unit}</div>
         </div>
         <div className="hud-right">
           <div style={{ fontSize: '1.3rem', fontWeight: 800 }}>
