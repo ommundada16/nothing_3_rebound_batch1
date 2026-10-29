@@ -6,10 +6,12 @@ const team=await account('careteam','care-review@example.test'),a=await account(
 assert.equal((await req('/api/auth/profile',{cookie:a.cookie,method:'PUT',body:{city:'Pune',postalCode:'411001'}})).status,200);
 assert.equal((await req('/api/auth/profile',{cookie:team.cookie,method:'PUT',body:{city:'Bad'}})).status,403);
 assert.equal((await req('/api/auth/register',{body:{name:'Blocked patient',email:'blocked@example.test',password,role:'patient'}})).status,403);
+const assistant=await account('assistant','assistant-review@example.test');
+assert.equal((await req('/api/care-team/directory',{cookie:assistant.cookie})).status,403);
 const family=await account('family','family-review@example.test');
 const familyState=(await req('/api/state',{cookie:family.cookie})).data.state;assert.equal(familyState.playbook,undefined);assert.equal(familyState.clinicBaseline,undefined);
 const nonce=Date.now();
-async function enrol(name,physioId,leg){const r=await req('/api/care-team/patients',{cookie:team.cookie,body:{name,age:62,email:`patient-${name.slice(-1)}-${nonce}@example.test`,password,city:'Pune',postalCode:'411001',procedure:'Synthetic knee replacement',surgeryDate:'2026-10-25',leg,physioId}});assert.equal(r.status,201,JSON.stringify(r.data));const login=await req('/api/auth/login',{body:{email:r.data.user.email,password}});assert.equal(login.status,200);return {...r.data,cookie:login.cookie};}
+async function enrol(name,physioId,leg){const r=await req('/api/care-team/patients',{cookie:team.cookie,body:{name,age:62,email:`patient-${name.slice(-1)}-${nonce}@example.test`,password,city:'Pune',postalCode:'411001',procedure:'Synthetic knee replacement',surgeryDate:'2026-10-25',leg,physioId,assistantId:assistant.data.user.id}});assert.equal(r.status,201,JSON.stringify(r.data));const login=await req('/api/auth/login',{body:{email:r.data.user.email,password}});assert.equal(login.status,200);return {...r.data,cookie:login.cookie};}
 const p=await enrol('Review patient A',a.data.user.id,'left'),q=await enrol('Review patient B',b.data.user.id,'right');
 assert.equal((await req('/api/patients',{cookie:a.cookie})).data.patients.some(x=>x.id===p.patient.id),true);
 assert.equal((await req('/api/patients',{cookie:a.cookie})).data.patients.some(x=>x.id===q.patient.id),false);
@@ -20,7 +22,7 @@ const states=await Promise.all([req('/api/state',{cookie:a.cookie,patient:p.pati
 const plan={exercises:[{id:'heel_slide',reps:3,holdSec:2,maxFlexion:90}],precautions:[],catalogueIds:['ankle_pumps']};assert.equal((await req('/api/state/plan',{cookie:a.cookie,patient:p.patient.id,method:'PUT',body:{value:plan}})).status,200);
 assert.equal((await req('/api/state',{cookie:q.cookie})).data.state.plan.exercises.length,0);
 assert.equal((await req('/api/state/plan',{cookie:p.cookie,method:'PUT',body:{value:plan}})).status,403);
-const concern=await req('/api/issues',{cookie:p.cookie,body:{suspectedSideEffect:true,text:'Synthetic medicine concern',symptoms:[],pain:0}});assert.equal(concern.data.issue.tier,'review');assert.equal((await req(`/api/issues/${concern.data.issue.id}/action`,{cookie:team.cookie,patient:p.patient.id,body:{action:'reply',text:'Synthetic review',byLevel:4}})).data.issue.thread.at(-1).by,3);
+const concern=await req('/api/issues',{cookie:p.cookie,body:{suspectedSideEffect:true,text:'Synthetic medicine concern',symptoms:[],pain:0}});assert.equal(concern.data.issue.tier,'review');assert.equal((await req(`/api/issues/${concern.data.issue.id}/action`,{cookie:team.cookie,patient:p.patient.id,body:{action:'reply',text:'Not a clinical user'}})).status,403);assert.equal((await req(`/api/issues/${concern.data.issue.id}/action`,{cookie:assistant.cookie,patient:p.patient.id,body:{action:'reply',text:'Synthetic review',byLevel:4}})).data.issue.thread.at(-1).by,3);
 const image=await req('/api/media?kind=screenshot&name=synthetic.png',{method:'POST',cookie:p.cookie,raw:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a7zQAAAAASUVORK5CYII=','base64')});assert.equal(image.status,200);
 assert.equal((await req('/api/media/'+image.data.id,{cookie:b.cookie})).status,403);
 assert.equal((await req('/api/media/'+image.data.id,{cookie:family.cookie})).status,403);

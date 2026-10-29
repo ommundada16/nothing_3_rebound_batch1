@@ -1,3 +1,4 @@
+import {ensureDemoAccounts,demoSnapshot,DEMO_PASSWORD} from './demoAccounts.js';
 import {AsyncLocalStorage} from 'node:async_hooks';
 import {installCareRegistry} from './careRegistry.js';
 import express from 'express';
@@ -86,15 +87,18 @@ if (!process.env.PHYSIO_SKIP_IMPORT) {
  }
 }
 registry=installCareRegistry(app,{dir:DATA_DIR,accounts,legacy:{state:legacyState,file:STATE_FILE},context});
+const demoAccounts=process.env.REBOUND_DEMO_ACCOUNTS==='0'?[]:ensureDemoAccounts({accounts,registry,referenceVideos:legacyState.refVideos,addImage:(id,patientId,angle)=>{writeFileSync(resolve(MEDIA_DIR,id),demoSnapshot(angle));media[id]={mime:'image/svg+xml',kind:'screenshot',name:'Demo illustration',patientId,ts:Date.now()};writeFileSync(MEDIA_INDEX,JSON.stringify(media));return id;}});
+app.get('/api/auth/demo-accounts',(_req,res)=>res.json({accounts:demoAccounts,password:demoAccounts.length?DEMO_PASSWORD:null}));
+
 // This build supports one patient, one assigned physio and one guardian.
 app.use('/api', (req,res,next) => {
  if(req.path.startsWith('/auth/') || req.path === '/health') return next();
  if(!req.account) return res.status(401).json({error:'Please sign in.'});
  const role=req.account.role;
- if(role === 'family' && req.method === 'POST' && req.path === '/sessions') return res.status(403).json({error:'Exercise sessions are recorded from the patient account.'});
+ if(role !== 'patient' && req.method === 'POST' && req.path === '/sessions') return res.status(403).json({error:'Exercise sessions are recorded from the patient account.'});
  const staff=['physio','assistant','careteam'].includes(role);
  if(role !== 'physio' && (req.path.startsWith('/clock/') || req.path === '/reset'))return res.status(403).json({error:'Only the physio can use demo controls.'});
- if(!staff && (req.path === '/ai/note' || /\/issues\/[^/]+\/action/.test(req.path)))return res.status(403).json({error:'Only the care team can do this.'});
+ if(!['physio','assistant'].includes(role) && (req.path === '/ai/note' || /\/issues\/[^/]+\/action/.test(req.path)))return res.status(403).json({error:'Only a physio or assistant surgeon can review clinical concerns.'});
  if(req.method==='PUT' && req.path.startsWith('/state/')){
   const key=req.path.split('/').pop();
   const allowed=role==='physio' || ['assistant','careteam'].includes(role)&&['care','patient'].includes(key) || ['care','family'].includes(key);
@@ -140,7 +144,7 @@ app.put('/api/state/:key', (req, res) => {
   if (key === 'care') {
     const next = req.body.value;
     if (!validateCare(next)) return res.status(400).json({error:'Check the care plan fields and times.'});
-    if(!['physio','assistant','careteam'].includes(req.account.role) && (JSON.stringify(next.medicines)!==JSON.stringify(state.care.medicines) || next.proteinTarget!==state.care.proteinTarget || JSON.stringify(next.appointments)!==JSON.stringify(state.care.appointments))) return res.status(403).json({error:'Only the care team can change medicines, targets or appointments.'});
+    if(!['physio','assistant'].includes(req.account.role) && (JSON.stringify(next.medicines)!==JSON.stringify(state.care.medicines) || next.proteinTarget!==state.care.proteinTarget || JSON.stringify(next.appointments)!==JSON.stringify(state.care.appointments))) return res.status(403).json({error:'Only the care team can change medicines, targets or appointments.'});
   }
   if(key==='patient' && (!req.body.value || !Number.isFinite(req.body.value.surgeryTs)))return res.status(400).json({error:'Enter a valid surgery date.'});
   state[key] = req.body.value;

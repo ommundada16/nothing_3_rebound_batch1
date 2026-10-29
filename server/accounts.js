@@ -3,8 +3,8 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 export function installAccounts(app, file, onLogin = () => {}) {
  const users = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : [];
  const sessions = new Map();
- const publicUser = u => ({id:u.id, name:u.name, email:u.email, role:u.role,city:u.city||'',postalCode:u.postalCode||''});
- const addUser=({name,email,password,role,city='',postalCode=''})=>{if(users.some(u=>u.email===email.toLowerCase()))throw new Error('That email is already registered.');const salt=randomBytes(16).toString('hex');const user={id:randomUUID(),name:name.trim(),email:email.toLowerCase(),role,city:String(city||'').trim().slice(0,100),postalCode:String(postalCode||'').trim().slice(0,20),salt,hash:scryptSync(password,salt,64).toString('hex')};users.push(user);save();return user;};
+ const publicUser = u => ({id:u.id, name:u.name, email:u.email, role:u.role,city:u.city||'',postalCode:u.postalCode||'',isDemo:Boolean(u.isDemo)});
+ const addUser=({name,email,password,role,city='',postalCode='',isDemo=false})=>{if(users.some(u=>u.email===email.toLowerCase()))throw new Error('That email is already registered.');const salt=randomBytes(16).toString('hex');const user={id:randomUUID(),name:name.trim(),email:email.toLowerCase(),role,isDemo,city:String(city||'').trim().slice(0,100),postalCode:String(postalCode||'').trim().slice(0,20),salt,hash:scryptSync(password,salt,64).toString('hex')};users.push(user);save();return user;};
  const save = () => writeFileSync(file, JSON.stringify(users));
  const cookie = (req, res, token) => res.setHeader('Set-Cookie', `pt_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${token ? 86400 : 0}${req.secure ? '; Secure' : ''}`);
  app.use('/api', (req,res,next) => {
@@ -19,8 +19,8 @@ export function installAccounts(app, file, onLogin = () => {}) {
   if(typeof name!=='string' || !name.trim() || typeof email!=='string' || !/^[^ @]+@[^ @]+\.[^ @]+$/.test(email) || typeof password!=='string' || password.length<8 || password.length>128 || !['patient','physio','family','assistant','careteam'].includes(role)) return res.status(400).json({error:'Enter a name, valid email and a password of 8–128 characters.'});
   if(users.some(u=>u.email===email.toLowerCase())) return res.status(400).json({error:'That email is already registered.'});
   if(role==='patient')return res.status(403).json({error:'Your care team creates your patient account. Ask them for your sign-in details.'});
-  if(role!=='physio'&&users.some(u=>u.role===role)) return res.status(400).json({error:'This single-family prototype already has that account. Sign in with the existing account.'});
-  const user=addUser({...req.body,name,email,password,role});onLogin(user);
+  if(role==='family'&&users.some(u=>u.role===role)) return res.status(400).json({error:'This single-family prototype already has that account. Sign in with the existing account.'});
+  const user=addUser({name,email,password,role,city:req.body.city,postalCode:req.body.postalCode});onLogin(user);
   const token=randomBytes(32).toString('hex');sessions.set(token,{id:user.id,expires:Date.now()+86400000});cookie(req,res,token);
   res.json({user:publicUser(user)});
  });
