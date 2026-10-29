@@ -1,6 +1,6 @@
 import MedicineReport from '../components/MedicineReport.jsx';
 import { useState } from 'react';
-import { CareReminders } from './DailyCare.jsx';
+import { CareReminders, AssignedPhysio } from './DailyCare.jsx';
 import { EXERCISES, heelSlideTasks, exerciseTaskDone } from '../../shared/exercises.js';
 import { dayPostOp } from '../../shared/time.js';
 import { api } from '../lib/api.js';
@@ -42,6 +42,7 @@ export default function Family({ store }) {
   return (
     <main className="page phone">
       <CareReminders store={store}/>
+      <AssignedPhysio patientId={state.patient.id||state.patient.name}/>
       <div className="stack">
         <div>
           <p className="muted small" style={{ margin: 0 }}>
