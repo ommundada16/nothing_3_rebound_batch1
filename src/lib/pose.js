@@ -13,9 +13,9 @@ export function loadPose() {
           baseOptions: { modelAssetPath: '/models/pose_landmarker_full.task', delegate },
           runningMode: 'VIDEO',
           numPoses: 1,
-          minPoseDetectionConfidence: 0.5,
-          minPosePresenceConfidence: 0.5,
-          minTrackingConfidence: 0.5,
+          minPoseDetectionConfidence: 0.35,
+          minPosePresenceConfidence: 0.35,
+          minTrackingConfidence: 0.35,
         });
       try {
         return await make('GPU');

@@ -24,7 +24,7 @@ export class RepCounter {
     this.lastTick = 0;
     this.value = null;
     this.velocity = 0;
-    this.lastValidT = null;
+    this.lastValidT = null; this.gapStart=null;
   }
 
   get completed() {
@@ -57,8 +57,17 @@ export class RepCounter {
 
   // v: smoothed signal in degrees, or null when the camera cannot see the leg.
   update(v, t) {
-    if (!Number.isFinite(v)) { this.loseTracking(); return; }
-    if(this.lastValidT != null && t-this.lastValidT > 350) this.loseTracking();
+    if(!Number.isFinite(v)) {
+      this.gapStart ??= t;
+      if(t-this.gapStart>500)this.loseTracking();
+      return;
+    }
+    if(this.gapStart!=null){
+      const gap=t-this.gapStart;
+      if(gap>500)this.loseTracking();
+      else if(this.state==='holding')this.holdStart+=gap;
+      this.gapStart=null;
+    } else if(this.lastValidT != null && t-this.lastValidT>750)this.loseTracking();
     this.lastValidT=t;
     if(this.state === 'recovering') {
       this.value=v;

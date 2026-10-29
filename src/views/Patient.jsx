@@ -212,7 +212,7 @@ function streak(sessions, now) {
 function Progress({ state, now }) {
   const sx = state.patient.surgeryTs;
   const dp = dayPostOp(now(), sx);
-  const hs = heelChart(state.sessions, sx);
+  const hs = heelChart(state.sessions.filter(s=>!s.isTestSession&&s.ts>=sx), sx);
   const slr = slrChart(state.sessions, sx);
   const bestActive = hs.active.length ? Math.max(...hs.active.map((p) => p.y)) : null;
   const bestAssisted = hs.assisted.length ? Math.max(...hs.assisted.map((p) => p.y)) : null;

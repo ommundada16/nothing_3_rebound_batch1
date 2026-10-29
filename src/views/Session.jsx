@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { CuePlayer } from '../lib/cues.js';
 import { Smoother, bestSide, flexionFrom, liftFrom, readLeg } from '../lib/geometry.js';
 import { detect, loadPose, openCamera } from '../lib/pose.js';
+import { TrackingQuality } from '../lib/trackingQuality.js';
 import { AngleGuard } from '../lib/angleGuard.js';
 import { RepCounter } from '../lib/repCounter.js';
 import { SIM_H, SIM_W, createSim, drawScene } from '../lib/sim.js';
@@ -39,7 +40,8 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
 
   const [step, setStep] = useState('setup'); // setup | live | summary
   const [mode] = useState(initialMode);
-  const [side, setSide] = useState(state.patient.leg || 'left');
+  const [side, setSide] = useState(()=>{try{return localStorage.getItem('rebound-camera-leg') || state.patient.leg || 'left';}catch{return state.patient.leg || 'left';}});
+  const chooseSide = value => {setSide(value);try{localStorage.setItem('rebound-camera-leg',value);}catch{}};
   const [source, setSource] = useState('camera');
   const [facing, setFacing] = useState('user');
   const [err, setErr] = useState('');
@@ -88,7 +90,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     const timer=setTimeout(()=>{if(r.running)fn();},ms);
     r.timers.push(timer);
   };
-  const canEncourage = () => {const r=run.current;return r.running && !r.guardStatus?.blocked && !r.lowSince && performance.now()-(r.lastValidFrame ?? -Infinity)<350;};
+  const canEncourage = () => {const r=run.current;return r.running && !r.guardStatus?.blocked && !r.lowSince && performance.now()-(r.lastValidFrame ?? -Infinity)<1000;};
 
   // ---------- helpers ----------
   const compose = useCallback(
@@ -141,6 +143,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     const r = run.current;
     r.shots = [];
     r.timers=[]; r.finishing=false; r.lastVT=null; r.selectedSide=null;
+    r.quality=new TrackingQuality();r.trackingNotice=false;r.recoveredSince=null;
     r.guard=new AngleGuard({maxFlexion,margin:Number(planEx.warningMarginDeg)||5});
     r.guardStatus={state:'unknown',blocked:true};
     r.limitEvents=[]; r.observedPeak=null;
@@ -155,7 +158,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     r.running = true;
     r.startedAt = Date.now(); r.startedPerf=performance.now(); r.lastValidFrame=null;
     r.firstRepStarted = false;
-    r.smoother = new Smoother(0.35);
+    r.smoother = new Smoother(0.55);
     r.cues = new CuePlayer({
       getCues: () => state.cues || {},
       getLang: () => state.cueLanguage || 'en',
@@ -230,15 +233,10 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
           cues.play('start', { priority: true });
         }
         if (r.pushTimer) clearInterval(r.pushTimer);
-        later(() => {if(canEncourage())cues.play('push');}, 600);
-        r.pushTimer = setInterval(() => {
-          if (r.counter.state === 'moving' && canEncourage()) cues.play('push');
-        }, 2600);
         r.curDeficits = [];
         break;
       case 'tracking_lost':
-        clearInterval(r.pushTimer); r.cues.stop();
-        if(typeof speechSynthesis !== 'undefined')speechSynthesis.cancel();
+        clearInterval(r.pushTimer);
         break;
       case 'abort':
         clearInterval(r.pushTimer);
@@ -249,7 +247,6 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         snap(e.value);
         break;
       case 'hold_tick':
-        if (canEncourage() && !cues.hasRealClip('hold')) cues.speak(String(e.sec));
         if (e.sec === 1) snap(r.counter.holdPeak);
         break;
       case 'release':
@@ -257,18 +254,16 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         pushDeficit();
         break;
       case 'early_release':
-        if(canEncourage())cues.play('again', { priority: true });
         pushDeficit();
         break;
       case 'stalled':
-        if(canEncourage())cues.play('again');
         break;
       case 'rep_done':
         if (e.complete) later(() => {if(canEncourage()){cues.play('good');}}, 1500);
         if (r.counter.completed >= planEx.reps && !r.finishing) {
           r.finishing = true;
           later(() => cues.play('done', { priority: true }), 2600);
-          later(() => finish(), 5200);
+          later(()=>{const waitUntilQuiet=()=>{if(r.cues.busy)later(waitUntilQuiet,400);else finish();};waitUntilQuiet();},5200);
         }
         break;
       default:
@@ -319,7 +314,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
           landmarks = null;
         }
       } else {
-        if(now-(r.lastValidFrame ?? r.startedPerf)>350) {
+        if(now-(r.lastValidFrame ?? r.startedPerf)>1200) {
           r.counter.update(null,now);r.guardStatus=r.guard.update(null,now);
           if(now-r.lastUi>250){r.lastUi=now;setLive(v=>({...v,value:null,conf:0,low:true,tick:0,phase:r.counter.state,guard:'unknown'}));}
         }
@@ -341,12 +336,14 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     const conf = leg ? leg.confidence : 0;
     r.confSum += conf;
     r.confN += 1;
-    const ok = leg && conf >= 0.65 && [leg.hip,leg.knee,leg.ankle].every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.x>=0&&p.x<=w&&p.y>=0&&p.y<=h);
+    const raw = leg ? (cfg.signal === 'flexion' ? flexionFrom(leg.hip,leg.knee,leg.ankle) : liftFrom(leg.hip,leg.knee)) : null;
+    const quality=r.quality.assess(leg,w,h,raw);
+    if(!quality.accepted && leg && leg.confidence<.35){const other=readLeg(landmarks,LEG[useSide==='left'?'right':'left'],w,h);if(other?.confidence>=.5)quality.reason=`The other leg is clearer. Check the selected ${useSide} knee or adjust the side view.`;}
+    const ok=quality.accepted;
 
     let value = null;
     if (ok) {
       r.validN+=1; r.lastValidFrame=now;
-      const raw = cfg.signal === 'flexion' ? flexionFrom(leg.hip, leg.knee, leg.ankle) : liftFrom(leg.hip, leg.knee);
       if(!r.selectedSide)r.selectedSide=useSide;
       value = r.smoother.push(raw);
       r.lastPose = { hip: leg.hip, knee: leg.knee, ankle: leg.ankle };
@@ -356,36 +353,30 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
       if(guard.speak) {
         clearInterval(r.pushTimer);
         const tag=guard.state === 'limit' ? 'angle_limit' : 'near_limit';
-        r.cues.play(tag,{priority:true});
-        if(!r.cues.hasRealClip(tag)) {
-          const text=guard.state === 'limit' ? `Your prescribed maximum is ${maxFlexion} degrees. Stop bending. Do not go past this. Gently release.` : `You are close to your ${maxFlexion} degree limit. Do not bend further.`;
-          r.cues.speak(text);setCaption({tag,text,source:'system'});
-        }
+        const text=guard.state === 'limit' ? `Your prescribed maximum is ${maxFlexion} degrees. Stop bending and gently release.` : `You are close to your ${maxFlexion} degree limit. Do not bend further.`;
+        r.cues.play(tag,{priority:true,text:r.cues.hasRealClip(tag)?undefined:text,valid:()=>r.running&&r.guardStatus?.blocked});
         r.limitEvents.push({state:guard.state,angle:Math.round(raw),atMs:Math.round(now-r.startedPerf)});
         if(guard.state === 'limit')snap(value);
       }
       r.counter.update(value, now);
       if(guard.state === 'limit')r.counter.invalidateLimit();
-      const milestone=Math.floor(value/15)*15;
-      if(!guard.blocked && r.counter.state === 'moving' && milestone>r.lastMilestone && milestone>=30 && now-r.lastAngleSpoken>8000 && now>r.cues.busyUntil) {
-        r.lastMilestone=milestone;r.lastAngleSpoken=now;
-        r.cues.speak(`${milestone} degrees. Keep your movement gentle.`);
-        r.cues.busyUntil=now+3500;
-      }
       if (cfg.signal === 'lift' && r.counter.state === 'holding') {
         const d = flexionFrom(leg.hip, leg.knee, leg.ankle);
         if (d != null) r.curDeficits.push(d);
       }
       r.lowSince = null;
+      r.recoveredSince ??= now;
+      if(now-r.recoveredSince>3000)r.trackingNotice=false;
     } else {
-      r.counter.update(null,now); r.smoother.reset();
+      r.counter.update(null,now);
+      r.recoveredSince=null;
       r.guardStatus=r.guard.update(null,now);
       if(r.lowSince == null)r.lowSince=now;
     }
-    const low = !ok && r.lowSince != null && now - r.lowSince > 900;
-    if (low && now - r.lastSpeak > 9000) {
-      r.lastSpeak = now;
-      r.cues.speak('I cannot see your knee. Move the phone back, and keep the whole leg in view.');
+    const low = !ok && r.lowSince != null && now - r.lowSince > 2200;
+    if(low && !r.trackingNotice && now-r.lowSince>5000){
+      const spoken=r.cues.speak('Please adjust the camera so the whole leg is in view.',{key:'tracking-help'});
+      if(spoken)r.trackingNotice=true;
     }
 
     // overlay
@@ -406,7 +397,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         done: r.counter.completed,
         tick: r.counter.state === 'holding' ? Math.min(planEx.holdSec, (now - r.counter.holdStart) / 1000) : 0,
         conf,
-        low, guard:r.guardStatus.state,
+        low, guard:r.guardStatus.state, reason:quality.reason, quality:quality.quality, side:useSide,
       });
     }
     schedule();
@@ -458,6 +449,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         durationS: summary.seconds,
         prescribedMaxFlexion:maxFlexion,
         limitEvents:run.current.limitEvents,
+        isTestSession:(run.current.selectedSide || side)!==state.patient.leg,
       });
       toast(res.newFlags?.length ? 'Saved. Your physio has been sent a summary to look at.' : 'Saved. Well done.');
       onExit();
@@ -484,6 +476,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
       <div className="stack exercise-setup">
         <button className="link-btn back-link" onClick={onExit}>‹ Back to exercises</button>
         <div><h1>{name}</h1><p className="muted">{mode === 'assisted' ? 'With help, as your physio showed you.' : 'Bend your knee using your own muscles.'}</p></div>
+        <fieldset className="knee-choice"><legend>Which knee are you tracking?</legend><div className="chips">{['left','right'].map(leg=><button type="button" className={`chip ${side===leg?'on':''}`} aria-pressed={side===leg} key={leg} onClick={()=>chooseSide(leg)}>{leg==='left'?'Left knee':'Right knee'}</button>)}</div>{side!==state.patient.leg&&<p className="small muted">Tracking the {side} knee for this test. The recovery plan is for the {state.patient.leg} knee.</p>}</fieldset>
         <RefVideos refVideos={state.refVideos} exerciseId={exerciseId} mode={mode} />
         <p className="exercise-prescription"><b>{planEx.reps} repetitions</b> · Hold for <b>{planEx.holdSec} seconds</b></p>
         <p>Move gently. Stop if you feel sharp pain.</p>
@@ -497,7 +490,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
             <label className="field">Practice with<select value={source} onChange={e=>setSource(e.target.value)}><option value="camera">My camera</option><option value="sim">Demo animation</option></select></label>
             {source === 'camera' && <>
               <label className="field">Camera<select value={facing} onChange={e=>setFacing(e.target.value)}><option value="environment">Back camera</option><option value="user">Front / laptop camera</option></select></label>
-              <label className="field">Leg<select value={side} onChange={e=>setSide(e.target.value)}><option value="left">Left</option><option value="right">Right</option><option value="auto">Choose automatically</option></select></label>
+
             </>}
             <p className="small muted">Video is processed on your device. Saved exercise pictures are shared with your physio.</p>
             {state.plan.precautions.length > 0 && <><h3>Your physio’s reminders</h3><ul>{state.plan.precautions.map(p=><li key={p}>{p}</li>)}</ul></>}
@@ -599,7 +592,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
             {caption.source === 'placeholder' && <small>Placeholder voice. Your physio's recording will play here.</small>}
           </div>
         )}
-        {live.low && <div className="lowconf">I cannot see your knee clearly. Move the phone back and keep your whole leg in view.</div>}
+        {live.low && <div className="lowconf" role="status">{live.reason || 'Adjust the camera to see your whole leg.'}</div>}
       </div>
 
       <Card tight>
@@ -607,7 +600,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
           <div className="grow">
             <div style={{ fontWeight: 700 }}>{live.guard === 'limit' || live.guard === 'near' ? 'Do not bend further. Follow your prescribed limit.' : PHASE_TEXT[live.phase]}</div>
             <div className="small muted">
-              {mode === 'assisted' ? 'Assisted' : 'Unassisted'} · {cfg.name} · camera tracking {Math.round(live.conf * 100)}%
+              {mode === 'assisted' ? 'Assisted' : 'Unassisted'} · Tracking {live.side || side} knee · visibility {Math.round(live.conf * 100)}%
             </div>
             <div className="meter" style={{ marginTop: 8 }}>
               <i style={{ width: `${Math.round(live.conf * 100)}%`, background: live.conf < 0.5 ? 'var(--urgent)' : 'var(--brand)' }} />
