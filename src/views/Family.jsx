@@ -1,5 +1,6 @@
+import MedicineReport from '../components/MedicineReport.jsx';
 import { useState } from 'react';
-import DailyCare, { CareReminders } from './DailyCare.jsx';
+import { CareReminders } from './DailyCare.jsx';
 import { EXERCISES, heelSlideTasks, exerciseTaskDone } from '../../shared/exercises.js';
 import { dayPostOp } from '../../shared/time.js';
 import { api } from '../lib/api.js';
@@ -10,7 +11,7 @@ import { Card, Icon, Toast, useToast } from '../components/ui.jsx';
 // reason for family members to quiz the patient about their exercises.
 export default function Family({ store }) {
   const { state, now, refresh } = store;
-  const [tab,setTab]=useState('care');
+  const [tab,setTab]=useState('recovery');
   const toast = useToast();
   const fam = state.family || { shareLevel: 'status', helperRequest: null };
   const open = state.issues.filter((i) => i.status !== 'resolved');
@@ -40,9 +41,8 @@ export default function Family({ store }) {
 
   return (
     <main className="page phone">
-      <div className="tabs"><button className={`tab ${tab==='care'?'active':''}`} onClick={()=>setTab('care')}>Daily care</button><button className={`tab ${tab==='recovery'?'active':''}`} onClick={()=>setTab('recovery')}>Recovery & help</button></div>
       <CareReminders store={store}/>
-      {tab === 'care' ? <DailyCare store={store} family/> : <div className="stack">
+      <div className="stack">
         <div>
           <p className="muted small" style={{ margin: 0 }}>
             For the family of
@@ -115,7 +115,7 @@ export default function Family({ store }) {
 
         <Card title="What is shared with the family" tight>
           <p className="tiny muted" style={{ marginTop: 0 }}>
-            Chosen once at set-up by the patient. Exercise sharing is chosen once. Medicines and appointments are shared for daily care; private exercise photos and pain scores are not shown here.
+            Chosen once at set-up by the patient. Exercise sharing is chosen once. Private exercise photos and pain scores are not shown here.
           </p>
           <div className="chips">
             {[
@@ -128,7 +128,8 @@ export default function Family({ store }) {
             ))}
           </div>
         </Card>
-      </div>}
+      </div>
+      <MedicineReport refresh={refresh}/>
       <Toast msg={toast.msg} onDone={toast.clear} />
     </main>
   );

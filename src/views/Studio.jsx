@@ -283,92 +283,13 @@ export function VideoStudio({ state, refresh, toast }) {
 // ---------------------------------------------------------------------------
 // Plan: reps, holds, pillow stage, precautions.
 // ---------------------------------------------------------------------------
-export function PlanStudio({ state, refresh, toast, suggestions }) {
-  const [plan, setPlan] = useState(() => structuredClone(state.plan));
-  const [prec, setPrec] = useState(state.plan.precautions.join('\n'));
-
-  const setEx = (id, patch) => setPlan({ ...plan, exercises: plan.exercises.map((e) => (e.id === id ? { ...e, ...patch } : e)) });
-
-  const save = async () => {
-    const next = { ...plan, precautions: prec.split('\n').map((s) => s.trim()).filter(Boolean), updatedBy: 'Physio' };
-    const error=movementPlanError(next);
-    if(error){toast(error);return;}
-    await api.setKey('plan', next, 'physio');
-    await refresh();
-    toast('Plan saved. The patient sees it straight away.');
-  };
-
-  return (
-    <div className="stack">
-      {suggestions.filter(s => s.type !== 'suggest_progression').map((s) => (
-        <div key={s.key} className="callout review">
-          <b>{s.title}</b> {s.detail}
-          <div style={{ marginTop: 8 }}>
-            <button
-              className="btn small primary"
-              onClick={async () => {
-                const next = { ...plan, exercises: plan.exercises.map((e) => (e.id === 'slr' ? { ...e, stage: 'nopillow' } : e)) };
-                setPlan(next);
-                await api.setKey('plan', next, 'physio');
-                await refresh();
-                toast('Pillow removed from the plan. Only you can make this change.');
-              }}
-            >
-              Approve: remove the pillow
-            </button>
-          </div>
-        </div>
-      ))}
-      <Card title="Prescribed exercises">
-        <div className="stack">
-          {plan.exercises.filter(e => e.id === 'heel_slide').map((e) => (
-            <div key={e.id} className="grid three">
-              <div>
-                <label className="field">Exercise</label>
-                <div style={{ fontWeight: 700 }}>{EXERCISES[e.id].name}</div>
-              </div>
-              <div>
-                <label className="field">Reps</label>
-                <input type="number" min="1" max="30" value={e.reps} onChange={(ev) => setEx(e.id, { reps: +ev.target.value })} />
-              </div>
-              <div>
-                <label className="field">Hold (seconds)</label>
-                <input type="number" min="1" max="30" value={e.holdSec} onChange={(ev) => setEx(e.id, { holdSec: +ev.target.value })} />
-              </div>
-              <label className="field">Doctor’s maximum bend (degrees)
-                <input type="number" min="30" max="150" placeholder="Only if prescribed, e.g. 90" value={e.maxFlexion ?? ''} onChange={ev=>setEx(e.id,{maxFlexion:ev.target.value === '' ? null : Number(ev.target.value)})}/>
-                <span className="tiny">Warnings start 5° before this estimate. Leave blank if no limit is prescribed.</span>
-              </label>
-              <label className="field">Physio’s repetition target (degrees)
-                <input type="number" min="20" max="150" placeholder="Optional" value={e.targetFlexion ?? ''} onChange={ev=>setEx(e.id,{targetFlexion:ev.target.value === '' ? null : Number(ev.target.value)})}/>
-                <span className="tiny">Count a held repetition at this bend, followed by a return to the starting position.</span>
-              </label>
-              {e.id === 'slr' && (
-                <div>
-                  <label className="field">Pillow stage</label>
-                  <select value={e.stage || 'pillow'} onChange={(ev) => setEx(e.id, { stage: ev.target.value })}>
-                    <option value="pillow">Small pillow under the knee</option>
-                    <option value="nopillow">No pillow</option>
-                  </select>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </Card>
-      <Card title="Precautions and notes the patient sees">
-        <label className="field">One per line</label>
-        <textarea value={prec} onChange={(e) => setPrec(e.target.value)} />
-        <label className="field" style={{ marginTop: 10 }}>
-          Note
-        </label>
-        <input type="text" value={plan.notes || ''} onChange={(e) => setPlan({ ...plan, notes: e.target.value })} />
-      </Card>
-      <button className="btn primary" onClick={save}>
-        Save plan
-      </button>
-    </div>
-  );
+export function PlanStudio({state,refresh,toast}) {
+ const [plan,setPlan]=useState(()=>structuredClone(state.plan));
+ const ex=plan.exercises.find(e=>e.id==='heel_slide')||{id:'heel_slide',reps:8,holdSec:3,modesEnabled:[]};
+ const modes=ex.modesEnabled||['active','assisted'];
+ const patch=changes=>setPlan({...plan,exercises:[{...ex,...changes}]});
+ async function save(){const next={...plan,exercises:plan.exercises.map(e=>({...e,targetFlexion:null}))};const error=movementPlanError(next);if(error){toast(error);return;}try{await api.setKey('plan',next,'physio');await refresh();toast('Exercise plan saved.');}catch(e){toast(e.message);}}
+ return <div className="stack"><Card title="Exercise plan">{[['active','Heel slide — unassisted'],['assisted','Heel slide — assisted']].map(([mode,label])=><div className="row between" key={mode}><h3>{label}</h3><button className="btn" aria-label={`${modes.includes(mode)?'Remove':'Add'} ${label}`} aria-pressed={modes.includes(mode)} onClick={()=>patch({modesEnabled:modes.includes(mode)?modes.filter(m=>m!==mode):[...modes,mode]})}>{modes.includes(mode)?'−':'+'}</button></div>)}{modes.length>0&&<div className="grid three">{[['reps','Repetitions',1,30],['holdSec','Hold (seconds)',1,30],['maxFlexion','Maximum bend (degrees)',30,150]].map(([key,label,min,max])=><label className="field" key={key}>{label}<input type="number" min={min} max={max} value={ex[key]??''} placeholder={key==='maxFlexion'?'If prescribed':''} onChange={e=>patch({[key]:e.target.value===''?null:Number(e.target.value)})}/></label>)}</div>}<p className="small muted">These settings apply to both selected heel-slide exercises.</p></Card><button className="btn primary" onClick={save}>Save plan</button></div>;
 }
 
 // ---------------------------------------------------------------------------

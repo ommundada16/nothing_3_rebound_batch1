@@ -6,7 +6,8 @@ import { api } from '../lib/api.js';
 import { heelChart, relTime, sessionsToday, slrChart } from '../lib/data.js';
 import { Card, Icon, LineChart, Stat, Toast, useToast } from '../components/ui.jsx';
 import RefVideos from '../components/RefVideos.jsx';
-import DailyCare, { CareReminders } from './DailyCare.jsx';
+import { CareReminders } from './DailyCare.jsx';
+import ClinicalMessages from '../components/ClinicalMessages.jsx';
 import Session from './Session.jsx';
 import { MyConcerns, ReportForm, ReportResult } from './Report.jsx';
 
@@ -42,7 +43,7 @@ export default function Patient({ store }) {
   return (
     <main className="page phone">
       <CareReminders store={store}/>
-      {tab === 'care' && <DailyCare store={store}/>}
+      {tab === 'messages' && <ClinicalMessages store={store} patient/>}
       {tab === 'today' && <Today state={state} now={now} store={store} setSession={setSession} setTab={setTab} dueFollowUps={dueFollowUps} toast={toast} />}
       {tab === 'progress' && <Progress state={state} now={now} />}
       {tab === 'help' && (
@@ -61,7 +62,7 @@ export default function Patient({ store }) {
         <div className="tabbar-inner">
           {[
             ['today', 'Today', 'today'],
-            ['care', 'Daily care', 'today'],
+            ['messages', 'Messages', 'help'],
             ['progress', 'Progress', 'chart'],
             ['help', 'Help', 'help'],
           ].map(([id, label, icon]) => (

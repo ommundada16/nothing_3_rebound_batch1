@@ -1,9 +1,17 @@
-import {useState} from 'react';
-import {api,mediaUrl} from '../lib/api.js';
-import {Card} from './ui.jsx';
-export default function ClinicalMessages({store}){
- const {state,refresh}=store;const [message,setMessage]=useState(''),[busy,setBusy]=useState(false);
- const issues=[...state.issues].sort((a,b)=>b.createdAt-a.createdAt);
- async function act(id,action,text){setBusy(true);try{await api.issueAction(id,{action,text});await refresh();setMessage('Updated.');}catch(e){setMessage(e.message);}finally{setBusy(false);}}
- return <section className="stack"><h1>Patient messages</h1>{message&&<p className="callout" role="status">{message}</p>}{!issues.length&&<Card><p>No messages to review.</p></Card>}{issues.map(i=><Card key={i.id} title={i.title}><span className={`badge ${i.status==='resolved'?'ok':i.tier}`}>{i.status==='resolved'?'Reviewed':i.tier==='urgent'?'Needs prompt review':'For review'}</span><p style={{marginTop:12}}>{i.summary}</p>{i.photoId&&<img src={mediaUrl(i.photoId)} alt="Original patient attachment" style={{width:'100%',maxHeight:280,objectFit:'contain',borderRadius:12}}/>}{i.medicineLabel&&<><h3>Text read from the medicine photo</h3><pre className="ocr-text">{i.medicineLabel.text||'The label was not readable. Please check the original photo.'}</pre><p className="small muted">OCR is unverified. A label does not establish whether the medicine caused symptoms.</p>{i.medicineLabel.barcode&&<p>Barcode: {i.medicineLabel.barcode}</p>}</>}{i.voiceId&&<audio controls src={mediaUrl(i.voiceId)}/>}<details className="more"><summary>Conversation</summary>{i.thread.map((m,n)=><p className="small" key={n}>{m.text}</p>)}</details>{i.status!=='resolved'&&<form className="stack" onSubmit={e=>{e.preventDefault();const form=new FormData(e.currentTarget);act(i.id,'reply',form.get('note'));}}><label className="field">Reply or review note<textarea name="note" required/></label><div className="row wrap"><button name="action" value="reply" className="btn primary" disabled={busy}>Send reply</button><button type="button" className="btn" disabled={busy} onClick={e=>{const note=e.currentTarget.form.elements.note.value;if(note.trim())act(i.id,'resolve',note);}}>Mark reviewed</button><input type="hidden" name="chosenAction" value="reply" readOnly/></div></form>}</Card>)}</section>;
+import {useEffect,useRef,useState} from 'react';
+import {api} from '../lib/api.js';
+export default function ClinicalMessages({store,patient=false}){
+ const {state,refresh}=store;
+ const [text,setText]=useState(''),[medicine,setMedicine]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const history=useRef(null);
+ const issues=state.issues.filter(i=>i.source==='patient');
+ const messages=issues.flatMap(i=>i.thread.filter(m=>m.by!=='system').map((m,n)=>({...m,key:`${i.id}-${n}`}))).sort((a,b)=>a.ts-b.ts);
+ useEffect(()=>{if(history.current)history.current.scrollTop=history.current.scrollHeight;},[messages.length]);
+ async function send(e){e.preventDefault();setBusy(true);setError('');try{
+  const body=medicine.trim()?`Medicine not suiting me: ${medicine.trim()}. ${text.trim()}`:text.trim();
+  if(patient)await api.reportIssue({text:body,suspectedSideEffect:Boolean(medicine.trim()),symptoms:[],pain:0});
+  else {const target=[...issues].sort((a,b)=>b.createdAt-a.createdAt)[0];if(!target)throw new Error('The patient has not started a conversation yet.');await api.issueAction(target.id,{action:'reply',text:body});}
+  setText('');setMedicine('');await refresh();
+ }catch(e){setError(e.message);}finally{setBusy(false);}}
+ return <section className="stack"><h2>{patient?'Messages to my care team':'Patient conversation'}</h2><div ref={history} className="chat-history" role="log" aria-label="Conversation">{!messages.length&&<p className="muted">No messages yet.</p>}{messages.map(m=><div className={`chat-bubble ${m.by==='patient'?'from-patient':'from-team'}`} key={m.key}><b>{m.by==='patient'?'Patient':'Care team'}</b><p>{m.text}</p><small>{new Date(m.ts).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})}</small></div>)}</div><form className="stack" onSubmit={send}>{patient&&<label className="field">Medicine not suiting you? Enter its name<input value={medicine} onChange={e=>setMedicine(e.target.value)} placeholder="Optional medicine name"/></label>}<label className="field">Message<textarea value={text} onChange={e=>setText(e.target.value)} required={!medicine.trim()} placeholder={patient?'Tell your care team what is happening…':'Write a reply…'}/></label>{error&&<p role="alert">{error}</p>}<button className="btn primary" disabled={busy||(!text.trim()&&!medicine.trim())}>{busy?'Sending…':'Send message'}</button>{patient&&<p className="small muted">Messages are reviewed in the app. Do not wait for a reply if you need urgent help.</p>}</form></section>;
 }
