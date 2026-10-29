@@ -41,7 +41,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
   const [mode] = useState(initialMode);
   const [side, setSide] = useState(state.patient.leg || 'left');
   const [source, setSource] = useState('camera');
-  const [facing, setFacing] = useState('environment');
+  const [facing, setFacing] = useState('user');
   const [err, setErr] = useState('');
   const [caption, setCaption] = useState(null);
   const [live, setLive] = useState({ value: null, phase: 'rest', done: 0, tick: 0, conf: 0, low: false });
@@ -573,6 +573,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
   const holdPct = Math.min(1, live.tick / planEx.holdSec);
   return (
     <div className="stack">
+      {source === 'sim' && <div className="banner">Demo animation — no camera. These measurements are simulated.</div>}
       {loadingModel && <p className="callout" role="status">Opening your camera…</p>}
       {maxFlexion && <div className={`callout ${live.guard === 'limit' ? 'urgent' : 'review'}`} role="status">{live.guard === 'limit' ? `Stop bending. Prescribed maximum ${maxFlexion}°. Gently release.` : live.guard === 'near' ? `Near your ${maxFlexion}° limit. Do not bend further.` : `Prescribed maximum: ${maxFlexion}° · Camera estimate`}</div>}
       <div className={`stage ${source === 'camera' && facing === 'environment' ? '' : ''}`} style={{ aspectRatio: aspect }}>
@@ -606,7 +607,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
           <div className="grow">
             <div style={{ fontWeight: 700 }}>{live.guard === 'limit' || live.guard === 'near' ? 'Do not bend further. Follow your prescribed limit.' : PHASE_TEXT[live.phase]}</div>
             <div className="small muted">
-              {mode === 'assisted' ? 'Assisted' : 'Active'} · {cfg.name} · camera tracking {Math.round(live.conf * 100)}%
+              {mode === 'assisted' ? 'Assisted' : 'Unassisted'} · {cfg.name} · camera tracking {Math.round(live.conf * 100)}%
             </div>
             <div className="meter" style={{ marginTop: 8 }}>
               <i style={{ width: `${Math.round(live.conf * 100)}%`, background: live.conf < 0.5 ? 'var(--urgent)' : 'var(--brand)' }} />
