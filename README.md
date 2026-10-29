@@ -1,6 +1,6 @@
 ## Try the named demo workspace
 
-The sign-in screen lists 14 fictional Indian-name accounts around Pune and Mumbai. Choose a card and sign in with `ReboundDemo2026!`. Full list and role duties: [docs/DEMO_ACCOUNTS.md](docs/DEMO_ACCOUNTS.md). Demo records are separate from existing records.
+There are 14 fictional Indian-name demo accounts around Pune and Mumbai. Their credentials are kept in the demo guide, not on the login page. Full list and role duties: [docs/DEMO_ACCOUNTS.md](docs/DEMO_ACCOUNTS.md). Demo records are separate from existing records.
 
 Progress now plots the highest saved angle per day automatically. Assistant surgeons handle clinical follow-ups; care-team accounts handle enrolment, assignments and robot operations.
 

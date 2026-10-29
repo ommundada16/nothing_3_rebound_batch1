@@ -2,7 +2,7 @@
 
 All names, medical histories, messages and locations below are fictional demo profiles. Common Indian names are used; these are not real patients or verified clinicians. Demo accounts and records are isolated from existing non-demo records.
 
-Open http://localhost:8787/ and use the demo-account chooser below Sign in. Selecting a card fills the credentials; then click Sign in.
+Open http://localhost:8787/ and enter an email from this guide with the shared demo password. The login page does not display the demo directory or credentials.
 
 **Shared demo password:** `ReboundDemo2026!`
 

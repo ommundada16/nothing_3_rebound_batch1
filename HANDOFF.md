@@ -1,3 +1,7 @@
+## Login cleanup — 29 October 2026
+
+Removed the demo-account directory, password display, credential autofill and demo-list fetch from Account.jsx at the user’s request. Demo accounts remain available; sign-in credentials are in docs/DEMO_ACCOUNTS.md.
+
 ## Daily-highest graphs, role separation and named demos — 29 October 2026
 
 This section overrides earlier practice-checkbox and shared assistant/care-team descriptions.
