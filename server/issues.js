@@ -151,7 +151,7 @@ export function createIssueFromFlag(state, flag) {
 export function syncObjective(state) {
   const now = nowOf(state);
   const { flags } = analyze({
-    sessions: state.sessions.filter(s => s.exercise === 'heel_slide' && !s.isTestSession && s.leg===state.patient.leg && s.ts>=state.patient.surgeryTs),
+    sessions: state.sessions.filter(s => s.exercise === 'heel_slide' && !s.isTestSession && (s.leg===state.patient.leg || s.leg==null&&s.captureStatus==='limited'&&s.metrics?.peak==null) && s.ts>=state.patient.surgeryTs),
     now,
     surgeryTs: state.patient.surgeryTs,
     playbook: state.playbook,

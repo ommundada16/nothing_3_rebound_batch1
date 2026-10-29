@@ -51,6 +51,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
   const [summary, setSummary] = useState(null);
   const [self, setSelf] = useState({ pain: 2, confidence: 3 });
   const [saving, setSaving] = useState(false);
+  const [reported,setReported]=useState(false),[cameraHelp,setCameraHelp]=useState(false);
   const [muted, setMuted] = useState(false);
   const [loadingModel, setLoadingModel] = useState(false);
 
@@ -203,7 +204,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         } catch {
           /* ignore */
         }
-        r.sim = createSim({ exercise: exerciseId, peak: prof.peak, deficit: prof.deficit, holdSec: planEx.holdSec, side: state.patient.leg, flawRep: flaw });
+        r.sim = createSim({ exercise: exerciseId, peak: maxFlexion?Math.min(prof.peak,maxFlexion-8):prof.peak, deficit: prof.deficit, holdSec: planEx.holdSec, side: state.patient.leg, flawRep: flaw });
         r.w = SIM_W;
         r.h = SIM_H;
         setAspect(`${SIM_W} / ${SIM_H}`);
@@ -446,7 +447,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
       const res = await api.saveSession({
         exercise: exerciseId,
         mode,
-        leg: run.current.selectedSide || side,
+        leg: run.current.selectedSide || null,
         legSource: 'automatic-camera-estimate',
         stage,
         reps: summary.reps,
@@ -458,7 +459,10 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
         durationS: summary.seconds,
         prescribedMaxFlexion:maxFlexion,
         limitEvents:run.current.limitEvents,
-        isTestSession:(run.current.selectedSide || side)!==state.patient.leg,
+        isTestSession:Boolean(run.current.selectedSide && run.current.selectedSide!==state.patient.leg)||run.current.source==='sim',
+        captureStatus:summary.peak==null?'limited':'measured',
+        patientReportedCompletion:reported,
+        trackingNote:summary.peak==null?'Camera measurement was unreliable; preserve this attempt without asking for another set.':null,
       });
       toast(res.newFlags?.length ? 'Saved. Your physio has been sent a summary to look at.' : 'Saved. Well done.');
       onExit();
@@ -547,7 +551,8 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
           </Card>
         )}
 
-        {summary.peak == null && <div className="callout review">No consistent measurement was recorded. Keep the same leg in view with the hip, knee and ankle visible, then try again.<button className="btn" onClick={()=>setStep('setup')}>Try again</button></div>}
+        {summary.peak == null && <div className="callout review"><b>Your effort still counts.</b><p>The camera could not confirm the measurements. Save this session for your physio to review. You do not need to repeat the exercise just to get a recording.</p></div>}
+        <label className="completion-confirm"><input type="checkbox" checked={reported} onChange={e=>setReported(e.target.checked)}/><span>I completed the prescribed exercise.<small>This is your report, kept separate from camera-counted repetitions.</small></span></label>
         <p className="small muted">{summary.reps.filter(r=>r.limitExceeded).length>0?`${summary.reps.filter(r=>r.limitExceeded).length} repetitions crossed the prescribed maximum and were excluded.`:'A full repetition includes the prescribed hold and a return to the starting position.'}</p><Card title="How was it?">
           <label className="field">Pain during the exercise: {self.pain} / 10</label>
           <input type="range" min="0" max="10" value={self.pain} onChange={(e) => setSelf({ ...self, pain: +e.target.value })} />
@@ -562,7 +567,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
           <button className="btn grow" onClick={onExit}>
             Discard
           </button>
-          <button className="btn primary grow" onClick={save} disabled={saving || summary.peak == null}>
+          <button className="btn primary grow" onClick={save} disabled={saving}>
             {saving ? 'Saving…' : 'Save session'}
           </button>
         </div>
@@ -570,93 +575,7 @@ export default function Session({ state, exerciseId, initialMode = 'active', onE
     );
   }
 
-  // live
-  const unit = cfg.signal === 'flexion' ? 'knee bend' : 'leg lift';
-  const holdPct = Math.min(1, live.tick / planEx.holdSec);
-  return (
-    <div className="stack">
-      {source === 'sim' && <div className="banner">Demo animation — no camera. These measurements are simulated.</div>}
-      {loadingModel && <p className="callout" role="status">Opening your camera…</p>}
-      {maxFlexion && <div className={`callout ${live.guard === 'limit' ? 'urgent' : 'review'}`} role="status">{live.guard === 'limit' ? `Stop bending. Prescribed maximum ${maxFlexion}°. Gently release.` : live.guard === 'near' ? `Near your ${maxFlexion}° limit. Do not bend further.` : `Prescribed maximum: ${maxFlexion}° · Camera estimate`}</div>}
-      <div className={`stage ${source === 'camera' && facing === 'environment' ? '' : ''}`} style={{ aspectRatio: aspect }}>
-        <div className={source === 'camera' && facing === 'user' ? 'mirror' : ''} style={{ position: 'absolute', inset: 0 }}>
-          <video ref={videoRef} playsInline muted style={{ display: source === 'camera' ? 'block' : 'none' }} />
-          <canvas ref={sceneRef} style={{ display: source === 'sim' ? 'block' : 'none' }} />
-          <canvas ref={overlayRef} />
-        </div>
-        <div className="hud-angle">
-          <div className="n">{live.value != null ? Math.round(live.value) : '--'}°</div>
-          <div className="l">{live.paused ? 'Last estimate' : unit}</div>
-        </div>
-        <div className="hud-right">
-          <div style={{ fontSize: '1.3rem', fontWeight: 800 }}>
-            {live.done} / {planEx.reps}
-          </div>
-          <div className="tiny">full reps</div>
-        </div>
-        {caption && (
-          <div className={`caption ${caption.source === 'placeholder' ? 'placeholder' : ''}`}>
-            {caption.source === 'physio' ? 'Your physio: ' : ''}
-            {caption.text}
-            {caption.source === 'placeholder' && <small>Placeholder voice. Your physio's recording will play here.</small>}
-          </div>
-        )}
-        {live.low && <div className="lowconf" role="status">{live.reason || 'Adjust the camera to see your whole leg.'}</div>}
-      </div>
-
-      {source==='camera' && live.paused && <Card title={live.guidance?.title||'Waiting for the camera'}>
-        <p role="status">{live.guidance?.tip||'Keep your torso, hip, knee and foot visible. Hold still briefly in the starting position.'}</p>
-        <details className="more"><summary>Camera and position checklist</summary><ol><li>Use the supported position shown in your physio’s reference video.</li><li>Put the camera at knee height, squarely beside your exercising leg, about 1.5–2 metres away.</li><li>Include your torso, hip, knee and foot with some space around them.</li><li>Keep the exercising leg closest to the camera. Avoid the other leg or furniture blocking it.</li><li>Use good light from in front of you and keep the camera steady.</li></ol></details>
-        <button className="btn" onClick={()=>{const r=run.current;r.selector=new LockedLegTracker();r.jointFilter.reset();r.smoother.reset();r.quality=new TrackingQuality();r.counter.loseTracking();r.restartingSide=r.selectedSide;}}>Check camera position again</button>
-      </Card>}
-
-      <Card tight>
-        <div className="row between">
-          <div className="grow">
-            <div style={{ fontWeight: 700 }}>{live.guard === 'limit' || live.guard === 'near' ? 'Do not bend further. Follow your prescribed limit.' : PHASE_TEXT[live.phase]}</div>
-            <div className="small muted">
-              {mode === 'assisted' ? 'Assisted' : 'Unassisted'} · Tracking {live.side || 'detecting'} knee · visibility {Math.round(live.conf * 100)}%
-            </div>
-            <div className="meter" style={{ marginTop: 8 }}>
-              <i style={{ width: `${Math.round(live.conf * 100)}%`, background: live.conf < 0.5 ? 'var(--urgent)' : 'var(--brand)' }} />
-            </div>
-          </div>
-          <div className="ring" aria-label="Hold progress">
-            <svg width="74" height="74" viewBox="0 0 74 74">
-              <circle cx="37" cy="37" r="31" fill="none" stroke="var(--surface-2)" strokeWidth="8" />
-              <circle cx="37" cy="37" r="31" fill="none" stroke="var(--brand)" strokeWidth="8" strokeDasharray={`${holdPct * 194.8} 194.8`} strokeLinecap="round" />
-            </svg>
-            <div className="t">{live.phase === 'holding' ? Math.ceil(planEx.holdSec - live.tick) : '–'}</div>
-          </div>
-        </div>
-      </Card>
-
-      <p className="tiny muted">A 2D camera estimate, not a clinical goniometer. Keep the camera still at the side of your leg.</p>
-      <div className="row">
-        <button className="btn" onClick={toggleMute} aria-pressed={muted}>
-          {muted ? 'Unmute' : 'Mute voice'}
-        </button>
-        <button
-          className="btn danger grow"
-          onClick={() => {
-            run.current.cues?.play('stop', { priority: true });
-            finish();
-          }}
-        >
-          <span className="row" style={{ justifyContent: 'center' }}>
-            <Icon name="stop" size={18} /> Stop and review
-          </span>
-        </button>
-      </div>
-      <button
-        className="btn ghost small"
-        onClick={() => {
-          stopAll();
-          onExit();
-        }}
-      >
-        Cancel without saving
-      </button>
-    </div>
-  );
+  // A calm, fixed camera workspace: one instruction, details only on request.
+  const instruction=live.guard==='limit'?`Stop bending. Maximum ${maxFlexion}°. Gently release.`:live.guard==='near'?`Near your ${maxFlexion}° limit. Do not bend further.`:live.paused?(live.guidance?.title||'Keep your whole leg in view.') : live.phase==='holding'?`Hold gently · ${Math.max(0,Math.ceil(planEx.holdSec-live.tick))}s`:live.phase==='released'?'Return slowly to your starting position.':live.phase==='recovering'?'Tracking paused. Return gently to the starting position.':live.phase==='moving'?'Bend gently at your own pace.':'Ready when you are. Start gently.';
+  return <section className="camera-workspace" aria-label="Exercise camera"><div className="camera-topline"><span>{mode==='assisted'?'Assisted':'Unassisted'} heel slide</span><span>{source==='sim'?'Demo animation · simulated readings':'On-device camera · estimated angles'}</span></div><div className="stage camera-stage"><div className={source==='camera'&&facing==='user'?'mirror':''} style={{position:'absolute',inset:0}}><video ref={videoRef} playsInline muted style={{display:source==='camera'?'block':'none'}}/><canvas ref={sceneRef} style={{display:source==='sim'?'block':'none'}}/><canvas ref={overlayRef}/></div><div className="camera-readings"><div><strong>{live.value!=null?`${Math.round(live.value)}°`:'—'}</strong><span>{live.paused?'Tracking paused':'Knee bend estimate'}</span></div><div><strong>{live.done}<small> / {planEx.reps}</small></strong><span>Full repetitions</span></div></div></div><div className={`camera-one-line ${['near','limit'].includes(live.guard)?'limit':''}`} role="status">{instruction}</div><div className="camera-controls"><button className="btn" onClick={toggleMute}>{muted?'Unmute':'Mute'}</button><button className="btn" onClick={()=>setCameraHelp(true)}>Camera help</button><button className="btn primary" onClick={finish}>Finish & save</button></div>{cameraHelp&&<div className="chat-backdrop"><section className="chat-dialog camera-help-dialog" role="dialog" aria-modal="true" aria-label="Camera help"><h2>{live.guidance?.title||'Set up a clear side view'}</h2><p>{live.guidance?.tip||'Keep your torso, hip, knee and foot visible, with the exercising leg closest to the camera.'}</p><ol><li>Use the supported position shown in your physio’s video.</li><li>Place the camera squarely beside your leg at knee height.</li><li>Use good light and keep furniture and the other leg from blocking the view.</li></ol><p>Tracking pauses do not erase your effort. You can save an attempt with uncertain measurements.</p><div className="row wrap"><button className="btn" onClick={()=>{const r=run.current;r.selector=new LockedLegTracker();r.jointFilter.reset();r.smoother.reset();r.quality=new TrackingQuality();r.counter.loseTracking();r.restartingSide=r.selectedSide;setCameraHelp(false);}}>Recheck position</button><button className="btn primary" autoFocus onClick={()=>setCameraHelp(false)}>Back to exercise</button></div></section></div>}</section>;
 }

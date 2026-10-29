@@ -101,7 +101,7 @@ app.get('/api/state', (req, res) => {
     patient:{name:state.patient.name,surgeryTs:state.patient.surgeryTs},
     family:state.family,care:state.care,plan:{exercises:state.plan.exercises.map(e=>({id:e.id,reps:e.reps,modesEnabled:e.modesEnabled,modeSettings:e.modeSettings}))},
     issues:state.issues.map(i=>({id:i.id,status:i.status,tier:i.tier})),
-    sessions:state.sessions.map(s=>({id:s.id,exercise:s.exercise,mode:s.mode,isTestSession:s.isTestSession,completedReps:s.reps?.filter(r=>r.complete).length || 0,ts:s.ts}))
+    sessions:state.sessions.map(s=>({id:s.id,exercise:s.exercise,mode:s.mode,isTestSession:s.isTestSession,completedReps:s.reps?.filter(r=>r.complete).length || 0,patientReportedCompletion:s.patientReportedCompletion,captureStatus:s.captureStatus,ts:s.ts}))
   } : state;
   res.json({ rev: state.rev, state: { ...visible, serverNow: nowOf(state), scenarios: SCENARIOS, ai: Boolean(process.env.GROQ_API_KEY) } });
 });
@@ -144,7 +144,7 @@ app.post('/api/sessions', (req, res) => {
     id: randomUUID(),
     ts: nowOf(state),
     by: 'patient',
-    text: `Logged ${session.exercise.replace('_', ' ')} (${session.mode}), best ${Math.round(session.metrics?.peak ?? 0)}°`,
+    text: `Logged ${session.exercise.replace('_', ' ')} (${session.mode}), ${session.metrics?.peak==null?'measurement unavailable':`best ${Math.round(session.metrics.peak)}°`}`,
   });
   commit();
   res.json({ session, newFlags: created.map((i) => ({ id: i.id, title: i.title, tier: i.tier })) });

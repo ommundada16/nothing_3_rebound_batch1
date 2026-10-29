@@ -59,6 +59,7 @@ function useHashRole() {
 export default function App() {
   const [user, setUser] = useState(null);
   const [homeVisit, setHomeVisit] = useState(0);
+  const [vision,setVision]=useState(false);
   const [checking, setChecking] = useState(true);
   const [authError, setAuthError] = useState('');
   useEffect(() => { api.get('/api/auth/me').then(r=>setUser(r.user)).catch(e=>setAuthError(e.message)).finally(()=>setChecking(false)); }, []);
@@ -68,8 +69,8 @@ export default function App() {
 
   const choices = user?.role === 'physio' ? ROLES.filter(r=>['physio'].includes(r.id)) : ROLES.filter(r=>r.id===user?.role);
   const currentRole = choices.some(r=>r.id===role) ? role : user?.role;
-  const goHome = () => { setRole(user?.role || 'patient'); setHomeVisit(n=>n+1); window.scrollTo(0,0); };
-  const ready = u => {setUser(u);setRole(u.role);};
+  const goHome = () => { setVision(false); setRole(user?.role || 'patient'); setHomeVisit(n=>n+1); window.scrollTo(0,0); };
+  const ready = u => {setVision(false);setUser(u);setRole(u.role);};
   if(checking) return <main className="page"><p>Opening Rebound…</p></main>;
   if(!user) return <><header className="topbar"><div className="topbar-inner"><a className="brand brand-home" href="/">Rebound</a></div></header>{authError&&<p className="page" role="alert">Cannot connect: {authError}. Start the server and refresh.</p>}<Account onReady={ready}/></>;
   return (
@@ -97,7 +98,7 @@ export default function App() {
               ))}
             </select>
           </label> : <span className="badge plain" style={{marginLeft:'auto'}}>{choices[0]?.label}</span>}
-          <span className="account-name tiny">{user.name}</span>
+          <button className="link-btn header-vision" onClick={()=>setVision(v=>!v)}>{vision?'My account':'Our vision'}</button><span className="account-name tiny">{user.name}</span>
           <button className="btn small" onClick={async()=>{await api.post('/api/auth/logout');setUser(null);}}>Sign out</button>
         </div>
       </header>
@@ -114,8 +115,8 @@ export default function App() {
         </div>
       ) : (
         <Boundary key={`${user.id}-${homeVisit}`} resetKey={currentRole}>
-          {currentRole === 'patient' ? (
-            <Patient store={store} />
+          {vision ? <Future onClose={()=>setVision(false)}/> : currentRole === 'patient' ? (
+            <Patient store={store} onVision={()=>setVision(true)} />
           ) : currentRole === 'physio' ? (
             <Physio store={store} />
           ) : currentRole === 'assistant' ? (

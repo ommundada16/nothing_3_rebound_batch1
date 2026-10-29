@@ -23,7 +23,7 @@ const testSession=await request('/api/sessions',{id:'other-knee-validation',exer
 console.log('PASS: account creation/sign-in, shared care, prescription protection, family privacy, side-effect routing, both video references.');
 const originalPlan=structuredClone(state.plan);
 assert.ok(state.activity.patientLastLogin);
-const plan={...state.plan,exercises:[{...state.plan.exercises.find(e=>e.id==='heel_slide'),modesEnabled:['assisted'],maxFlexion:90,targetFlexion:60}]};
+const plan={...state.plan,exercises:[{...state.plan.exercises.find(e=>e.id==='heel_slide'),modesEnabled:['assisted'],modeSettings:{},maxFlexion:90,targetFlexion:60}]};
 assert.equal((await request('/api/state/plan',{value:plan},users.physio,'PUT')).status,200);
 const alert={runId:'qa-limit-'+Date.now(),angle:92,mode:'assisted',leg:state.patient.leg};
 assert.equal((await request('/api/exercise-alerts',alert,users.family)).status,403);
@@ -44,3 +44,9 @@ const clinicianState=(await request('/api/state',null,users.physio,'GET')).data.
 assert.ok(clinicianState.sessions.some(s=>s.id===saved.data.session.id&&s.metrics.peak===115));
 assert.equal((await request('/api/state/plan',{value:modePlan},users.physio,'PUT')).status,200);
 console.log('PASS: independent exercise settings, per-mode maximum alerts and newly saved session visible to clinician.');
+
+const limited=await request('/api/sessions',{exercise:'heel_slide',mode:'assisted',leg:null,reps:[],metrics:{peak:null},captureStatus:'limited',patientReportedCompletion:true,cameraSource:'qa'},users.patient);
+assert.equal(limited.status,200);assert.equal(limited.data.session.metrics.peak,null);assert.equal(limited.data.session.reps.length,0);assert.equal(limited.data.session.isTestSession,false);
+const familyLimited=(await request('/api/state',null,users.family,'GET')).data.state.sessions.find(s=>s.id===limited.data.session.id);
+assert.equal(familyLimited.patientReportedCompletion,true);assert.equal(familyLimited.screenshotIds,undefined);
+console.log('PASS: limited session saves with no fabricated metrics and completion metadata respects family privacy.');

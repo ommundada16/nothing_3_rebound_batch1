@@ -50,7 +50,7 @@ export function heelSlideTasks(plan) {
 
 export function exerciseTaskDone(session, task) {
  const completed = session.completedReps ?? session.reps?.filter(r=>r.complete).length ?? 0;
- return !session.isTestSession && session.exercise === task.id && session.mode === task.mode && completed >= task.reps;
+ return !session.isTestSession && session.exercise === task.id && session.mode === task.mode && (completed >= task.reps || session.patientReportedCompletion===true);
 }
 
 export function exercisePrescription(plan,id,mode){
